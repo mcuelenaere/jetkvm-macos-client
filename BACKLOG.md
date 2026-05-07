@@ -5,6 +5,56 @@ to be picked up cold without re-litigating the original investigation.
 
 ---
 
+## Scroll wheel support (requires upstream JetKVM change)
+
+**Where (client):** `App/KVMVideoView.swift` would override
+`scrollWheel(with: NSEvent)` and forward to a new
+`Session.sendScroll(deltaY:)` that emits a HID-RPC wheel frame on
+the unreliable-ordered channel.
+`Packages/JetKVMProtocol/Sources/JetKVMProtocol/Codec/HIDRPCMessage.swift`
+intentionally omits a `wheelReport` case today — that comment is the
+thing to update once the wire format is settled.
+
+**Where (server):** `internal/hidrpc/hidrpc.go` defines
+`TypeWheelReport = 0x04` but no handler exists anywhere in the
+JetKVM tree. The TS UI also never sends one
+(`ui/src/hooks/hidRpc.ts` declares the constant with no encoder).
+Adding support, in roughly the right order:
+
+1. **Define the wire format.** A single signed byte is sufficient
+   for HID boot-mouse semantics — vertical wheel only, in HID
+   "click" units (positive = scroll up). Concretely:
+   `WheelReport: [deltaY: i8]`, payload size 1.
+2. **Decoder.** `internal/hidrpc/message.go`: add a
+   `WheelReport()` accessor returning `(deltaY int8, err)` with
+   the same length-strict pattern the existing `MouseReport()`
+   uses.
+3. **Dispatch.** `hidrpc.go` (root): add a case for
+   `TypeWheelReport` in `handleHidRPCMessage` that decodes and
+   forwards to the gadget driver.
+4. **Gadget driver.** `internal/usbgadget/`: most boot-mouse HID
+   descriptors already include 1 byte of wheel delta after the 2
+   dx/dy bytes — verify the JetKVM gadget descriptor does, then
+   add a `MouseWheel(delta int8)` (or extend `MouseReport`) that
+   writes a HID report with non-zero wheel and zero motion. If the
+   descriptor doesn't already include the wheel field, that's a
+   second sub-task: extend the descriptor and bump any version
+   string the host driver might cache.
+
+**Compatibility note.** Existing browser UI and clients don't send
+`WheelReport` at all, so adding server-side support is purely
+additive — old clients keep working, new clients gain scroll. No
+versioning gymnastics needed.
+
+**Client-side coalescing.** When this lands, the macOS client's
+`scrollWheel` handler should accumulate `NSEvent.scrollingDeltaY`
+(fractional points) into integer wheel ticks before sending — at
+the native NSEvent rate, scroll generates dozens of fractional
+samples per "tick" and we'd flood the gadget if we sent one HID
+report per sample.
+
+---
+
 ## Rework cookie handling to use a proper cookie jar
 
 **Where:** `Packages/JetKVMTransport/Sources/JetKVMTransport/HTTPClient.swift`

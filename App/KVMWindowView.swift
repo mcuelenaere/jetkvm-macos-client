@@ -75,6 +75,14 @@ struct KVMWindowView: View {
             capturer.onFlagsChanged = { [session] keyCode in
                 session.handleFlagsChanged(virtualKeyCode: keyCode)
             }
+            // When capture pauses (focus loss or user toggling off
+            // mid-keystroke), release any modifiers the tracker thinks
+            // are held on the host. Without this, e.g. a Cmd-down sent
+            // before a focus-out and a Cmd-up that the system swallowed
+            // would leave the host with a stuck Cmd modifier.
+            capturer.onSuspend = { [session] in
+                session.releaseAllHeldModifiers()
+            }
         }
         .onDisappear {
             capturer.disable()

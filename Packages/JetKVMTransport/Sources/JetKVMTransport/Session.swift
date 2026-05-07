@@ -174,6 +174,30 @@ public final class Session {
         Task { await webrtc.sendHID(message, on: .reliable) }
     }
 
+    /// Release every modifier the tracker thinks is held on the host
+    /// side, then reset the tracker. Call when capture pauses (e.g.
+    /// our app lost focus mid-keystroke) so the host doesn't end up
+    /// with stuck modifiers we'll never explicitly release.
+    public func releaseAllHeldModifiers() {
+        guard let webrtc else {
+            modifierTracker.reset()
+            return
+        }
+        let allBits: [ModifierBits] = [
+            .leftControl, .leftShift, .leftAlt, .leftMeta,
+            .rightControl, .rightShift, .rightAlt, .rightMeta,
+        ]
+        let held = modifierTracker.currentState
+        for bit in allBits where held.contains(bit) {
+            guard let usbHID = bit.usbHIDUsageID else { continue }
+            let message = HIDRPCMessage.keypressReport(key: usbHID, pressed: false)
+            if hidReady {
+                Task { await webrtc.sendHID(message, on: .reliable) }
+            }
+        }
+        modifierTracker.reset()
+    }
+
     /// Forward continuous mouse motion (mouseMoved / mouseDragged).
     /// Throttled to ~120 Hz at the InputThrottler — under congestion,
     /// dropping a stale absolute position is better than queueing it.

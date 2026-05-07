@@ -7,6 +7,7 @@ struct KVMWindowView: View {
     @State private var capturer = KeyboardCapturer()
     @State private var pointerLock = PointerLockManager()
     @State private var hostKey = HostKeyDetector()
+    @State private var keyboardMonitor: Any?
     @State private var showControls = false
     @State private var showStats = false
 
@@ -185,11 +186,36 @@ struct KVMWindowView: View {
                 guard pointerLock.state == .enabled else { return }
                 pointerLock.disable()
             }
+            // Second feed path: an NSEvent local monitor catches
+            // keyboard events delivered through the standard responder
+            // chain — the path used when keyboard-lock is off (CGEventTap
+            // not installed). When keyboard-lock IS on, events are
+            // swallowed at the session-level tap before they reach the
+            // WindowServer, so the monitor doesn't double-fire.
+            keyboardMonitor = NSEvent.addLocalMonitorForEvents(
+                matching: [.flagsChanged, .keyDown, .keyUp]
+            ) { [hostKey] event in
+                switch event.type {
+                case .flagsChanged:
+                    hostKey.didChangeFlags(event.modifierFlags)
+                case .keyDown:
+                    hostKey.didKeyDown(event.keyCode)
+                case .keyUp:
+                    hostKey.didKeyUp(event.keyCode)
+                default:
+                    break
+                }
+                return event
+            }
         }
         .onDisappear {
             capturer.disable()
             pointerLock.disable()
             hostKey.reset()
+            if let monitor = keyboardMonitor {
+                NSEvent.removeMonitor(monitor)
+                keyboardMonitor = nil
+            }
         }
     }
 

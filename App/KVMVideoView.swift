@@ -171,7 +171,14 @@ final class KVMVideoView: NSView {
 
     private func sendPointer(event: NSEvent, motion: Bool) {
         guard let session else { return }
-        guard let coords = normalizedCoords(event: event) else { return }
+        // Motion events outside the video rect (letterbox bars,
+        // toolbar, anywhere not over the actual host display) drop
+        // — otherwise the host cursor walks toward the edge of its
+        // screen tracking our cursor's clamped position. Button
+        // events always send (clamped) so a drag that starts inside
+        // and releases outside still produces a clean release on
+        // the host.
+        guard let coords = normalizedCoords(event: event, clampOutOfBounds: !motion) else { return }
         // NSEvent.pressedMouseButtons is a class property giving the
         // global currently-pressed-buttons bitmask. Lower 5 bits map
         // 1:1 to JetKVM's MouseButtons (left/right/middle/back/forward).
@@ -184,20 +191,23 @@ final class KVMVideoView: NSView {
     }
 
     /// View-local coordinates → 0..32767 normalized over the actual
-    /// rendered video sub-rect (so letterboxing doesn't desync the
-    /// host cursor). Returns nil if the video rect has zero area
-    /// (haven't received a frame yet, or the view collapsed).
-    private func normalizedCoords(event: NSEvent) -> (x: Int32, y: Int32)? {
+    /// rendered video sub-rect.
+    ///
+    /// - `clampOutOfBounds: false` (motion events): returns nil when
+    ///   the cursor is outside the video rect, so the caller can skip
+    ///   sending a no-op pointer update.
+    /// - `clampOutOfBounds: true` (button events): clamps to the
+    ///   nearest edge of the video rect, so we can always emit
+    ///   button up/down without leaving the host with a stuck button.
+    private func normalizedCoords(event: NSEvent, clampOutOfBounds: Bool) -> (x: Int32, y: Int32)? {
         let videoRect = videoContentRect
         guard videoRect.width > 0, videoRect.height > 0 else { return nil }
         let local = convert(event.locationInWindow, from: nil)
-        // Translate to video-rect-local space.
         let videoX = local.x - videoRect.minX
         let videoY = local.y - videoRect.minY
-        // Clamp — outside the video rect (in a letterbox bar, or a hair
-        // outside view bounds during fast motion) becomes the nearest
-        // edge so the host cursor stops at the corresponding edge of
-        // the video frame instead of drifting into the bars.
+        let inVideo = videoX >= 0 && videoX <= videoRect.width
+                   && videoY >= 0 && videoY <= videoRect.height
+        guard inVideo || clampOutOfBounds else { return nil }
         let clampedX = max(0, min(videoRect.width, videoX))
         let clampedY = max(0, min(videoRect.height, videoY))
         let nx = Int32(clampedX / videoRect.width * 32767)

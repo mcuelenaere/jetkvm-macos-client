@@ -9,10 +9,18 @@ import WebRTC
 /// The Metal view does the heavy lifting (VideoToolbox-backed hardware
 /// decode, Metal rendering); we keep first-responder + event handling on
 /// this parent view so input lands in code we control.
+///
+/// The view tracks the source video frame size via `RTCVideoViewDelegate`
+/// so it can compute the aspect-fit content rect (the actual rendered
+/// video sub-rect within the view, accounting for letterboxing /
+/// pillarboxing) and translate mouse coordinates accordingly. Without
+/// this, the host cursor drifts out of sync with the user's cursor over
+/// any black-bar regions.
 final class KVMVideoView: NSView {
     private var rtcView: RTCMTLNSVideoView?
     private weak var currentTrack: RTCVideoTrack?
     private weak var session: Session?
+    private var videoSize: CGSize = .zero
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -54,6 +62,9 @@ final class KVMVideoView: NSView {
     private func makeRTCView() -> RTCMTLNSVideoView {
         let view = RTCMTLNSVideoView(frame: bounds)
         view.translatesAutoresizingMaskIntoConstraints = false
+        // Become the delegate so didChangeVideoSize fires and we can
+        // track the source's aspect ratio for coord translation.
+        view.delegate = self
         addSubview(view)
         NSLayoutConstraint.activate([
             view.topAnchor.constraint(equalTo: topAnchor),
@@ -62,6 +73,38 @@ final class KVMVideoView: NSView {
             view.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
         return view
+    }
+
+    /// The aspect-fit sub-rect of the rendered video within `bounds`.
+    /// `RTCMTLNSVideoView` letterboxes/pillarboxes to preserve aspect, so
+    /// the actual pixels of the host display occupy this sub-rect, not
+    /// the whole view. We use this for mouse-coordinate translation.
+    private var videoContentRect: CGRect {
+        guard videoSize.width > 0, videoSize.height > 0,
+              bounds.width > 0, bounds.height > 0 else {
+            return bounds
+        }
+        let viewAspect = bounds.width / bounds.height
+        let videoAspect = videoSize.width / videoSize.height
+        if videoAspect > viewAspect {
+            // Video is wider than the view: letterbox top + bottom.
+            let h = bounds.width / videoAspect
+            return CGRect(
+                x: 0,
+                y: (bounds.height - h) / 2,
+                width: bounds.width,
+                height: h
+            )
+        } else {
+            // Video is taller than the view: pillarbox left + right.
+            let w = bounds.height * videoAspect
+            return CGRect(
+                x: (bounds.width - w) / 2,
+                y: 0,
+                width: w,
+                height: bounds.height
+            )
+        }
     }
 
     // MARK: - First responder + coordinate system
@@ -140,17 +183,31 @@ final class KVMVideoView: NSView {
         }
     }
 
-    /// View-local coordinates → 0..32767 normalized over view bounds.
-    /// Returns nil if the view has zero area (rare; defensive).
+    /// View-local coordinates → 0..32767 normalized over the actual
+    /// rendered video sub-rect (so letterboxing doesn't desync the
+    /// host cursor). Returns nil if the video rect has zero area
+    /// (haven't received a frame yet, or the view collapsed).
     private func normalizedCoords(event: NSEvent) -> (x: Int32, y: Int32)? {
-        guard bounds.width > 0, bounds.height > 0 else { return nil }
+        let videoRect = videoContentRect
+        guard videoRect.width > 0, videoRect.height > 0 else { return nil }
         let local = convert(event.locationInWindow, from: nil)
-        // Clamp — NSEvent can deliver mouseMoved with the cursor a hair
-        // outside the view bounds during fast motion.
-        let clampedX = max(0, min(bounds.width, local.x))
-        let clampedY = max(0, min(bounds.height, local.y))
-        let nx = Int32(clampedX / bounds.width * 32767)
-        let ny = Int32(clampedY / bounds.height * 32767)
+        // Translate to video-rect-local space.
+        let videoX = local.x - videoRect.minX
+        let videoY = local.y - videoRect.minY
+        // Clamp — outside the video rect (in a letterbox bar, or a hair
+        // outside view bounds during fast motion) becomes the nearest
+        // edge so the host cursor stops at the corresponding edge of
+        // the video frame instead of drifting into the bars.
+        let clampedX = max(0, min(videoRect.width, videoX))
+        let clampedY = max(0, min(videoRect.height, videoY))
+        let nx = Int32(clampedX / videoRect.width * 32767)
+        let ny = Int32(clampedY / videoRect.height * 32767)
         return (nx, ny)
+    }
+}
+
+extension KVMVideoView: RTCVideoViewDelegate {
+    func videoView(_ videoView: RTCVideoRenderer, didChangeVideoSize size: CGSize) {
+        videoSize = size
     }
 }

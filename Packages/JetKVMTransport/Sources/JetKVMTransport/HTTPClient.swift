@@ -25,6 +25,7 @@ public final class HTTPClient: @unchecked Sendable {
     public let endpoint: DeviceEndpoint
     public let cookieStorage: HTTPCookieStorage
     public let urlSession: URLSession
+    private let tlsDelegate: TLSDelegate
 
     private let encoder: JSONEncoder = JSONEncoder()
     private let decoder: JSONDecoder = JSONDecoder()
@@ -40,7 +41,9 @@ public final class HTTPClient: @unchecked Sendable {
         config.httpShouldSetCookies = true
         config.timeoutIntervalForRequest = 10
         config.timeoutIntervalForResource = 30
-        self.urlSession = URLSession(configuration: config)
+        let delegate = TLSDelegate(allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate)
+        self.tlsDelegate = delegate
+        self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
     }
 
     // MARK: - Endpoints

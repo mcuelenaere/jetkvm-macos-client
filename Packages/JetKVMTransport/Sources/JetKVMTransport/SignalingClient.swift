@@ -37,6 +37,7 @@ public actor SignalingClient {
     private var task: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
     private var streamContinuation: AsyncThrowingStream<SignalingMessage, Error>.Continuation?
+    private var tlsDelegate: TLSDelegate?
 
     private let encoder: JSONEncoder = JSONEncoder()
     private let decoder: JSONDecoder = JSONDecoder()
@@ -67,7 +68,9 @@ public actor SignalingClient {
         // URLSession applies cookies from the configured storage to the
         // WebSocket upgrade request automatically; that's how the authToken
         // cookie reaches the server here.
-        let session = URLSession(configuration: config)
+        let delegate = TLSDelegate(allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate)
+        self.tlsDelegate = delegate
+        let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         self.session = session
 
         let url = endpoint.webSocketURL(path: signalingPath)

@@ -8,13 +8,22 @@ struct ConnectView: View {
     @State private var port: String = "80"
     @State private var password: String = ""
     @State private var useTLS: Bool = false
+    @State private var trustSelfSignedCert: Bool = false
 
     private var isAwaitingPassword: Bool {
         if case .awaitingPassword = session.state { return true } else { return false }
     }
 
+    private var connectingPhase: Session.State.Phase? {
+        if case .connecting(let phase) = session.state { return phase } else { return nil }
+    }
+
     private var failureMessage: String? {
         if case .failed(let msg) = session.state { return msg } else { return nil }
+    }
+
+    private var inputsLocked: Bool {
+        connectingPhase != nil || isAwaitingPassword
     }
 
     var body: some View {
@@ -25,15 +34,20 @@ struct ConnectView: View {
             Form {
                 TextField("Host", text: $host, prompt: Text("kvm.local or 192.168.1.42"))
                     .textFieldStyle(.roundedBorder)
-                    .disabled(isAwaitingPassword)
+                    .disabled(inputsLocked)
 
                 HStack {
                     TextField("Port", text: $port)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 80)
-                        .disabled(isAwaitingPassword)
+                        .disabled(inputsLocked)
                     Toggle("HTTPS", isOn: $useTLS)
-                        .disabled(isAwaitingPassword)
+                        .disabled(inputsLocked)
+                    if useTLS {
+                        Toggle("Trust self-signed", isOn: $trustSelfSignedCert)
+                            .disabled(inputsLocked)
+                            .help("JetKVM ships with a self-signed certificate by default; enable this to accept it.")
+                    }
                 }
 
                 if isAwaitingPassword || !password.isEmpty {
@@ -42,7 +56,14 @@ struct ConnectView: View {
                 }
             }
 
-            if isAwaitingPassword {
+            if let phase = connectingPhase {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(phase.label)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if isAwaitingPassword {
                 Text("Device requires a password.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -61,7 +82,7 @@ struct ConnectView: View {
                     Task { await connect() }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(host.isEmpty)
+                .disabled(host.isEmpty || connectingPhase != nil)
             }
         }
         .padding(40)
@@ -71,7 +92,12 @@ struct ConnectView: View {
     @MainActor
     private func connect() async {
         guard let portValue = Int(port), portValue > 0, portValue < 65_536 else { return }
-        let endpoint = DeviceEndpoint(host: host, port: portValue, useTLS: useTLS)
+        let endpoint = DeviceEndpoint(
+            host: host,
+            port: portValue,
+            useTLS: useTLS,
+            allowSelfSignedCertificate: useTLS && trustSelfSignedCert
+        )
         let pwd = password.isEmpty ? nil : password
         await session.connect(endpoint: endpoint, password: pwd)
     }

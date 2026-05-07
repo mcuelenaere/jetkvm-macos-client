@@ -20,32 +20,21 @@ struct RootView: View {
 
     var body: some View {
         switch session.state {
-        case .idle, .awaitingPassword, .failed:
-            ConnectView()
-        case .connecting(let phase):
-            ConnectingView(phase: phase)
         case .connected, .kicked:
             KVMWindowView()
+        default:
+            // Keep ConnectView alive across .idle / .connecting / .awaitingPassword /
+            // .failed transitions so its @State (host, port, password) survives
+            // round-trips through the connect flow. Showing a switch over those
+            // sub-states here would tear down the form on every transition.
+            ConnectView()
         }
     }
 }
 
-struct ConnectingView: View {
-    let phase: Session.State.Phase
-
-    var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .controlSize(.large)
-            Text(label(for: phase))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func label(for phase: Session.State.Phase) -> String {
-        switch phase {
+extension Session.State.Phase {
+    var label: String {
+        switch self {
         case .checkingStatus: return "Checking device…"
         case .authenticating: return "Authenticating…"
         case .signaling: return "Opening signaling channel…"

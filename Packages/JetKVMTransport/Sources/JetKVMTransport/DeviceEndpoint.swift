@@ -9,11 +9,22 @@ public struct DeviceEndpoint: Sendable, Hashable {
     public let host: String
     public let port: Int
     public let useTLS: Bool
+    /// Accept the server's TLS certificate without normal trust validation.
+    /// JetKVM ships with a self-signed certificate by default, so HTTPS/WSS
+    /// connections fail closed without this opt-in. Only set true when the
+    /// user has explicitly accepted it for this device.
+    public let allowSelfSignedCertificate: Bool
 
-    public init(host: String, port: Int = 80, useTLS: Bool = false) {
+    public init(
+        host: String,
+        port: Int = 80,
+        useTLS: Bool = false,
+        allowSelfSignedCertificate: Bool = false
+    ) {
         self.host = host
         self.port = port
         self.useTLS = useTLS
+        self.allowSelfSignedCertificate = allowSelfSignedCertificate
     }
 
     public func httpURL(path: String, queryItems: [URLQueryItem]? = nil) -> URL {

@@ -163,11 +163,34 @@ public final class Session {
         Task { await webrtc.sendHID(message, on: .reliable) }
     }
 
-    /// Forward a `flagsChanged` event from the KVM view. Resolves the
-    /// transition through `ModifierTracker` and emits a single
-    /// `KeypressReport` for the modifier-key USB-HID code (0xE0..0xE7).
+    /// Forward a `flagsChanged` event from the KVM view. Two distinct
+    /// cases:
+    ///
+    /// - **Held modifiers** (Shift, Cmd, Option, Control). macOS fires
+    ///   `flagsChanged` on press *and* on release, so we let
+    ///   `ModifierTracker` toggle its internal state and emit one
+    ///   `KeypressReport` per transition with the modifier-key USB-HID
+    ///   code (0xE0..0xE7).
+    /// - **Caps Lock**. macOS treats it as a toggle and fires
+    ///   `flagsChanged` once per physical press, with the new toggle
+    ///   state in `modifierFlags`. The host (USB HID) wants a
+    ///   momentary press to flip its own CapsLock state, so we emit
+    ///   press + release back-to-back. Looking up via `KeyMap`
+    ///   (kVK_CapsLock 0x39 → USB HID 0x39).
     public func handleFlagsChanged(virtualKeyCode keyCode: UInt16) {
         guard hidReady, let webrtc else { return }
+
+        if keyCode == 0x39, let usbHID = KeyMap.virtualKeyToHIDUsageID[keyCode] {
+            // Caps Lock toggle — emit momentary press+release.
+            let down = HIDRPCMessage.keypressReport(key: usbHID, pressed: true)
+            let up = HIDRPCMessage.keypressReport(key: usbHID, pressed: false)
+            Task {
+                await webrtc.sendHID(down, on: .reliable)
+                await webrtc.sendHID(up, on: .reliable)
+            }
+            return
+        }
+
         guard let transition = modifierTracker.handle(modifierKeyCode: keyCode) else { return }
         guard let usbHID = transition.modifier.usbHIDUsageID else { return }
         let message = HIDRPCMessage.keypressReport(key: usbHID, pressed: transition.pressed)

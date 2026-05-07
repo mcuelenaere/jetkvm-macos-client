@@ -11,7 +11,6 @@
 		D200000000000000000000D2 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = E200000000000000000000E2 /* WebRTC */; };
 		D300000000000000000000D3 /* JetKVMProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = E400000000000000000000E4 /* JetKVMProtocol */; };
 		D400000000000000000000D4 /* JetKVMTransport in Frameworks */ = {isa = PBXBuildFile; productRef = E600000000000000000000E6 /* JetKVMTransport */; };
-		D500000000000000000000D5 /* ConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C400000000000000000000C4 /* ConnectView.swift */; };
 		D600000000000000000000D6 /* KVMWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C500000000000000000000C5 /* KVMWindowView.swift */; };
 		D700000000000000000000D7 /* KVMVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C600000000000000000000C6 /* KVMVideoView.swift */; };
 		D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C700000000000000000000C7 /* KeyboardCapturer.swift */; };
@@ -20,13 +19,18 @@
 		DB00000000000000000000DB /* PointerLockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA00000000000000000000CA /* PointerLockManager.swift */; };
 		DC00000000000000000000DC /* PasswordVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB00000000000000000000CB /* PasswordVault.swift */; };
 		DD00000000000000000000DD /* HostKeyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00000000000000000000CC /* HostKeyDetector.swift */; };
+		FA00000000000000000000FA /* SavedHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000000000000000000F1 /* SavedHost.swift */; };
+		FB00000000000000000000FB /* HostStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F200000000000000000000F2 /* HostStore.swift */; };
+		FC00000000000000000000FC /* HostsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F300000000000000000000F3 /* HostsView.swift */; };
+		FD00000000000000000000FD /* HostFormSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F400000000000000000000F4 /* HostFormSheet.swift */; };
+		FE00000000000000000000FE /* ConnectionStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F500000000000000000000F5 /* ConnectionStatusView.swift */; };
+		FF00000000000000000000FF /* KVMSessionWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F600000000000000000000F6 /* KVMSessionWindow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		C100000000000000000000C1 /* JetKVMClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JetKVMClientApp.swift; sourceTree = "<group>"; };
 		C200000000000000000000C2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C300000000000000000000C3 /* JetKVMClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JetKVMClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C400000000000000000000C4 /* ConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectView.swift; sourceTree = "<group>"; };
 		C500000000000000000000C5 /* KVMWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMWindowView.swift; sourceTree = "<group>"; };
 		C600000000000000000000C6 /* KVMVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMVideoView.swift; sourceTree = "<group>"; };
 		C700000000000000000000C7 /* KeyboardCapturer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCapturer.swift; sourceTree = "<group>"; };
@@ -35,6 +39,12 @@
 		CA00000000000000000000CA /* PointerLockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerLockManager.swift; sourceTree = "<group>"; };
 		CB00000000000000000000CB /* PasswordVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordVault.swift; sourceTree = "<group>"; };
 		CC00000000000000000000CC /* HostKeyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostKeyDetector.swift; sourceTree = "<group>"; };
+		F100000000000000000000F1 /* SavedHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedHost.swift; sourceTree = "<group>"; };
+		F200000000000000000000F2 /* HostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostStore.swift; sourceTree = "<group>"; };
+		F300000000000000000000F3 /* HostsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostsView.swift; sourceTree = "<group>"; };
+		F400000000000000000000F4 /* HostFormSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostFormSheet.swift; sourceTree = "<group>"; };
+		F500000000000000000000F5 /* ConnectionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusView.swift; sourceTree = "<group>"; };
+		F600000000000000000000F6 /* KVMSessionWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMSessionWindow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,7 +74,12 @@
 			isa = PBXGroup;
 			children = (
 				C100000000000000000000C1 /* JetKVMClientApp.swift */,
-				C400000000000000000000C4 /* ConnectView.swift */,
+				F300000000000000000000F3 /* HostsView.swift */,
+				F400000000000000000000F4 /* HostFormSheet.swift */,
+				F500000000000000000000F5 /* ConnectionStatusView.swift */,
+				F600000000000000000000F6 /* KVMSessionWindow.swift */,
+				F100000000000000000000F1 /* SavedHost.swift */,
+				F200000000000000000000F2 /* HostStore.swift */,
 				C500000000000000000000C5 /* KVMWindowView.swift */,
 				C600000000000000000000C6 /* KVMVideoView.swift */,
 				C700000000000000000000C7 /* KeyboardCapturer.swift */,
@@ -175,7 +190,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				D100000000000000000000D1 /* JetKVMClientApp.swift in Sources */,
-				D500000000000000000000D5 /* ConnectView.swift in Sources */,
+				FA00000000000000000000FA /* SavedHost.swift in Sources */,
+				FB00000000000000000000FB /* HostStore.swift in Sources */,
+				FC00000000000000000000FC /* HostsView.swift in Sources */,
+				FD00000000000000000000FD /* HostFormSheet.swift in Sources */,
+				FE00000000000000000000FE /* ConnectionStatusView.swift in Sources */,
+				FF00000000000000000000FF /* KVMSessionWindow.swift in Sources */,
 				D600000000000000000000D6 /* KVMWindowView.swift in Sources */,
 				D700000000000000000000D7 /* KVMVideoView.swift in Sources */,
 				D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */,

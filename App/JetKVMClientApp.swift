@@ -3,36 +3,45 @@ import JetKVMTransport
 
 @main
 struct JetKVMClientApp: App {
-    @State private var session = Session()
+    @State private var hostStore = HostStore()
 
     var body: some Scene {
-        WindowGroup("JetKVM") {
-            RootView()
-                .environment(session)
-                .frame(minWidth: 800, minHeight: 600)
+        // Root window: the saved-hosts list. Single instance — the
+        // user always returns here to launch sessions.
+        WindowGroup("JetKVM", id: "hosts") {
+            HostsView()
+                .environment(hostStore)
         }
-        .windowResizability(.contentSize)
-    }
-}
+        .defaultSize(width: 520, height: 420)
 
-struct RootView: View {
-    @Environment(Session.self) private var session
-
-    var body: some View {
-        switch session.state {
-        case .connected, .kicked, .reconnecting:
-            // .reconnecting lives in the KVM window so the user keeps
-            // their context (and last-frame video, since teardown nils
-            // the track) — falling back to ConnectView mid-session would
-            // be a jarring UX whiplash for what's usually a 1-2s blip.
-            KVMWindowView()
-        default:
-            // Keep ConnectView alive across .idle / .connecting / .awaitingPassword /
-            // .failed transitions so its @State (host, port, password) survives
-            // round-trips through the connect flow. Showing a switch over those
-            // sub-states here would tear down the form on every transition.
-            ConnectView()
+        // One window per connected host. Spawned by openWindow(value:)
+        // from HostsView with a SavedHost.id. Each window owns its own
+        // Session so multiple hosts can be connected at the same time.
+        WindowGroup("JetKVM Session", for: SavedHost.ID.self) { $hostID in
+            Group {
+                if let id = hostID, let host = hostStore.find(id: id) {
+                    KVMSessionWindow(host: host)
+                } else {
+                    // Window restored but the host no longer exists
+                    // (deleted between launches). Show a small
+                    // explainer instead of a blank window.
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                        Text("Saved host not found")
+                            .font(.headline)
+                        Text("Re-add it from the JetKVM window.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .environment(hostStore)
+            .frame(minWidth: 800, minHeight: 600)
         }
+        .defaultSize(width: 1280, height: 800)
     }
 }
 

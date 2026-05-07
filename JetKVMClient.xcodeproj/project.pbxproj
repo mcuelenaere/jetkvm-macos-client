@@ -11,12 +11,18 @@
 		D200000000000000000000D2 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = E200000000000000000000E2 /* WebRTC */; };
 		D300000000000000000000D3 /* JetKVMProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = E400000000000000000000E4 /* JetKVMProtocol */; };
 		D400000000000000000000D4 /* JetKVMTransport in Frameworks */ = {isa = PBXBuildFile; productRef = E600000000000000000000E6 /* JetKVMTransport */; };
+		D500000000000000000000D5 /* ConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C400000000000000000000C4 /* ConnectView.swift */; };
+		D600000000000000000000D6 /* KVMWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C500000000000000000000C5 /* KVMWindowView.swift */; };
+		D700000000000000000000D7 /* KVMVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C600000000000000000000C6 /* KVMVideoView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		C100000000000000000000C1 /* JetKVMClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JetKVMClientApp.swift; sourceTree = "<group>"; };
 		C200000000000000000000C2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C300000000000000000000C3 /* JetKVMClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JetKVMClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C400000000000000000000C4 /* ConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectView.swift; sourceTree = "<group>"; };
+		C500000000000000000000C5 /* KVMWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMWindowView.swift; sourceTree = "<group>"; };
+		C600000000000000000000C6 /* KVMVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMVideoView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,6 +52,9 @@
 			isa = PBXGroup;
 			children = (
 				C100000000000000000000C1 /* JetKVMClientApp.swift */,
+				C400000000000000000000C4 /* ConnectView.swift */,
+				C500000000000000000000C5 /* KVMWindowView.swift */,
+				C600000000000000000000C6 /* KVMVideoView.swift */,
 				C200000000000000000000C2 /* Info.plist */,
 			);
 			path = App;
@@ -148,6 +157,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				D100000000000000000000D1 /* JetKVMClientApp.swift in Sources */,
+				D500000000000000000000D5 /* ConnectView.swift in Sources */,
+				D600000000000000000000D6 /* KVMWindowView.swift in Sources */,
+				D700000000000000000000D7 /* KVMVideoView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -169,7 +181,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.jetkvm.client;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -194,7 +206,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.jetkvm.client;
 				PRODUCT_NAME = "$(TARGET_NAME)";

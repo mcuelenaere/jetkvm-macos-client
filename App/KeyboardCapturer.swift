@@ -57,6 +57,14 @@ final class KeyboardCapturer {
     var onKeyUp: ((UInt16) -> Void)?
     var onFlagsChanged: ((UInt16) -> Void)?
 
+    /// Fires alongside `onFlagsChanged` with the current bitmask of
+    /// pressed modifiers. Used by HostKeyDetector to spot the
+    /// pointer-lock release chord (Ctrl+Option held alone). We pass
+    /// the snapshot rather than expecting the listener to maintain
+    /// its own tracker — KeyboardCapturer already has it via the
+    /// CGEvent flags.
+    var onModifierFlagsChanged: ((NSEvent.ModifierFlags) -> Void)?
+
     /// Fires when an active tap is suspended — either the user
     /// toggled off, or the app lost focus while capture was on. Use
     /// this to release any modifiers your tracker thinks are held,
@@ -240,7 +248,13 @@ final class KeyboardCapturer {
                 switch type {
                 case .keyDown: onKeyDown?(keyCode)
                 case .keyUp: onKeyUp?(keyCode)
-                case .flagsChanged: onFlagsChanged?(keyCode)
+                case .flagsChanged:
+                    onFlagsChanged?(keyCode)
+                    // The CGEvent's flags field has the same bit layout
+                    // as NSEvent.ModifierFlags, so we can map straight
+                    // across without parsing keycodes ourselves.
+                    let flags = NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue))
+                    onModifierFlagsChanged?(flags)
                 default: break
                 }
                 return nil // swallow

@@ -19,6 +19,7 @@
 		DA00000000000000000000DA /* StatsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C900000000000000000000C9 /* StatsPanel.swift */; };
 		DB00000000000000000000DB /* PointerLockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA00000000000000000000CA /* PointerLockManager.swift */; };
 		DC00000000000000000000DC /* PasswordVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB00000000000000000000CB /* PasswordVault.swift */; };
+		DD00000000000000000000DD /* HostKeyDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00000000000000000000CC /* HostKeyDetector.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		C900000000000000000000C9 /* StatsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsPanel.swift; sourceTree = "<group>"; };
 		CA00000000000000000000CA /* PointerLockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerLockManager.swift; sourceTree = "<group>"; };
 		CB00000000000000000000CB /* PasswordVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordVault.swift; sourceTree = "<group>"; };
+		CC00000000000000000000CC /* HostKeyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostKeyDetector.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +70,7 @@
 				C700000000000000000000C7 /* KeyboardCapturer.swift */,
 				CA00000000000000000000CA /* PointerLockManager.swift */,
 				CB00000000000000000000CB /* PasswordVault.swift */,
+				CC00000000000000000000CC /* HostKeyDetector.swift */,
 				C800000000000000000000C8 /* ControlPanel.swift */,
 				C900000000000000000000C9 /* StatsPanel.swift */,
 				C200000000000000000000C2 /* Info.plist */,
@@ -178,6 +181,7 @@
 				D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */,
 				DB00000000000000000000DB /* PointerLockManager.swift in Sources */,
 				DC00000000000000000000DC /* PasswordVault.swift in Sources */,
+				DD00000000000000000000DD /* HostKeyDetector.swift in Sources */,
 				D900000000000000000000D9 /* ControlPanel.swift in Sources */,
 				DA00000000000000000000DA /* StatsPanel.swift in Sources */,
 			);

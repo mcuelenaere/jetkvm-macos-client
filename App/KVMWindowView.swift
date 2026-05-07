@@ -6,8 +6,13 @@ struct KVMWindowView: View {
     @Environment(Session.self) private var session
     @State private var capturer = KeyboardCapturer()
     @State private var pointerLock = PointerLockManager()
+    @State private var hostKey = HostKeyDetector()
     @State private var showControls = false
     @State private var showStats = false
+
+    /// UserDefaults key for the "Don't show this again" preference on
+    /// the pointer-lock confirmation dialog.
+    private static let skipPointerLockConfirmKey = "JetKVMSkipPointerLockConfirmation"
 
     private var keyboardCaptureBinding: Binding<Bool> {
         Binding(
@@ -22,7 +27,11 @@ struct KVMWindowView: View {
         Binding(
             get: { pointerLock.userIntent },
             set: { newValue in
-                if newValue { pointerLock.enable() } else { pointerLock.disable() }
+                if newValue {
+                    requestPointerLockEnable()
+                } else {
+                    pointerLock.disable()
+                }
             }
         )
     }
@@ -100,7 +109,7 @@ struct KVMWindowView: View {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Toggle(isOn: keyboardCaptureBinding) {
-                        Label("Keyboard shortcuts", systemImage: "keyboard")
+                        Label("Keyboard lock", systemImage: "keyboard")
                     }
                     Toggle(isOn: pointerLockBinding) {
                         Label("Pointer lock", systemImage: "cursorarrow.rays")
@@ -145,28 +154,74 @@ struct KVMWindowView: View {
             // Wire capturer event handlers into the same Session methods
             // KVMVideoView calls when the tap isn't installed. Same
             // contract: keyCode is the macOS Carbon virtual keycode.
-            capturer.onKeyDown = { [session] keyCode in
+            // Each handler also feeds HostKeyDetector so the ⌃⌥ release
+            // chord works while keyboard-lock is on (the trapped case
+            // — with keyboard-lock off, the user can already exit
+            // pointer-lock via Cmd+Tab → focus loss → auto-suspend).
+            capturer.onKeyDown = { [session, hostKey] keyCode in
+                hostKey.didKeyDown(keyCode)
                 session.sendKeypress(virtualKeyCode: keyCode, pressed: true)
             }
-            capturer.onKeyUp = { [session] keyCode in
+            capturer.onKeyUp = { [session, hostKey] keyCode in
+                hostKey.didKeyUp(keyCode)
                 session.sendKeypress(virtualKeyCode: keyCode, pressed: false)
             }
             capturer.onFlagsChanged = { [session] keyCode in
                 session.handleFlagsChanged(virtualKeyCode: keyCode)
+            }
+            capturer.onModifierFlagsChanged = { [hostKey] flags in
+                hostKey.didChangeFlags(flags)
             }
             // When capture pauses (focus loss or user toggling off
             // mid-keystroke), release any modifiers the tracker thinks
             // are held on the host. Without this, e.g. a Cmd-down sent
             // before a focus-out and a Cmd-up that the system swallowed
             // would leave the host with a stuck Cmd modifier.
-            capturer.onSuspend = { [session] in
+            capturer.onSuspend = { [session, hostKey] in
                 session.releaseAllHeldModifiers()
+                hostKey.reset()
+            }
+            hostKey.onTriggered = { [pointerLock] in
+                guard pointerLock.state == .enabled else { return }
+                pointerLock.disable()
             }
         }
         .onDisappear {
             capturer.disable()
             pointerLock.disable()
+            hostKey.reset()
         }
+    }
+
+    private func requestPointerLockEnable() {
+        if UserDefaults.standard.bool(forKey: Self.skipPointerLockConfirmKey) {
+            pointerLock.enable()
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Lock pointer to JetKVM?"
+        alert.informativeText = """
+            Your cursor will be hidden and pinned to this window, and mouse \
+            movement sent as relative deltas to the device.
+
+            To release the lock, press and hold ⌃⌥ (Control + Option) for half \
+            a second.
+            """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Lock pointer")
+        alert.addButton(withTitle: "Cancel")
+        let checkbox = NSButton(
+            checkboxWithTitle: "Don't show this again",
+            target: nil,
+            action: nil
+        )
+        checkbox.state = .off
+        alert.accessoryView = checkbox
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        if checkbox.state == .on {
+            UserDefaults.standard.set(true, forKey: Self.skipPointerLockConfirmKey)
+        }
+        pointerLock.enable()
     }
 
     /// Top-of-window banner used for kicked / failsafe / accessibility

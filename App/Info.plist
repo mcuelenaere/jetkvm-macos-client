@@ -26,5 +26,19 @@
     <string>NSApplication</string>
     <key>NSHumanReadableCopyright</key>
     <string></string>
+    <!--
+        JetKVM devices ship with self-signed TLS certificates by default.
+        With ATS active, the network stack fails the TLS handshake at the
+        BoringSSL layer before URLSession can invoke our trust delegate to
+        override. Disabling ATS (combined with the user-opt-in trust check
+        in TLSDelegate) lets the delegate fire so we can accept the cert.
+        This app only ever connects to a single user-chosen device per
+        session, so the practical attack surface is small.
+    -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
 </dict>
 </plist>

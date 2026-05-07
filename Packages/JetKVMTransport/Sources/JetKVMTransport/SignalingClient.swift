@@ -24,13 +24,13 @@ public enum SignalingError: Error, Sendable {
 /// WebSocket signaling client for the JetKVM device.
 ///
 /// One client per session. Drives the offer/answer/ICE flow per the protocol
-/// at `web.go:281-500`. Cookie-based auth is handled by `cookieStorage`,
-/// which the caller is expected to share with `HTTPClient` so the
-/// `authToken` cookie a prior `login()` set is replayed on the WebSocket
-/// handshake.
+/// at `web.go:281-500`. Cookie-based auth rides along on the WS upgrade
+/// request via the `Cookie:` header — caller (typically the Session
+/// actor) supplies the value from `HTTPClient.currentCookieHeader`
+/// after a successful login.
 public actor SignalingClient {
     private let endpoint: DeviceEndpoint
-    private let cookieStorage: HTTPCookieStorage
+    private let cookieHeader: String?
     private let signalingPath: String
 
     private var session: URLSession?
@@ -44,11 +44,11 @@ public actor SignalingClient {
 
     public init(
         endpoint: DeviceEndpoint,
-        cookieStorage: HTTPCookieStorage,
+        cookieHeader: String? = nil,
         signalingPath: String = "/webrtc/signaling/client"
     ) {
         self.endpoint = endpoint
-        self.cookieStorage = cookieStorage
+        self.cookieHeader = cookieHeader
         self.signalingPath = signalingPath
     }
 
@@ -62,19 +62,24 @@ public actor SignalingClient {
         guard task == nil else { throw SignalingError.alreadyConnected }
 
         let config = URLSessionConfiguration.ephemeral
-        config.httpCookieStorage = cookieStorage
-        config.httpCookieAcceptPolicy = .always
-        config.httpShouldSetCookies = true
-        // URLSession applies cookies from the configured storage to the
-        // WebSocket upgrade request automatically; that's how the authToken
-        // cookie reaches the server here.
+        config.httpCookieStorage = nil
+        config.httpCookieAcceptPolicy = .never
+        config.httpShouldSetCookies = false
         let delegate = TLSDelegate(allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate)
         self.tlsDelegate = delegate
         let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         self.session = session
 
+        // Build the upgrade request by hand so we can attach the auth
+        // cookie via the Cookie header — same approach HTTPClient uses
+        // (we don't trust URLSession's cookie storage based on hardware
+        // testing).
         let url = endpoint.webSocketURL(path: signalingPath)
-        let task = session.webSocketTask(with: url)
+        var request = URLRequest(url: url)
+        if let cookieHeader {
+            request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
+        }
+        let task = session.webSocketTask(with: request)
         self.task = task
         task.resume()
 

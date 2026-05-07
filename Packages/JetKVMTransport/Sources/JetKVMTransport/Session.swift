@@ -106,12 +106,13 @@ public final class Session {
             }
             self.device = device
 
-            // 3. Open signaling WS using the same cookie storage so the
-            //    authToken we just got rides along on the upgrade request.
+            // 3. Open signaling WS, replaying the auth cookie HTTPClient
+            //    captured from the login response so the upgrade request
+            //    carries it.
             state = .connecting(.signaling)
             let signaling = SignalingClient(
                 endpoint: endpoint,
-                cookieStorage: http.cookieStorage
+                cookieHeader: http.currentCookieHeader
             )
             self.signaling = signaling
             let (metadata, incoming) = try await signaling.connect()

@@ -181,11 +181,18 @@ public final class Session {
         guard hidReady, let webrtc else { return }
 
         if keyCode == 0x39, let usbHID = KeyMap.virtualKeyToHIDUsageID[keyCode] {
-            // Caps Lock toggle — emit momentary press+release.
+            // Caps Lock toggle. macOS hosts apply a debounce/minimum-hold
+            // duration to USB-HID Caps Lock (anti-accident, since Sierra),
+            // so a back-to-back press+release is rejected as a glitch.
+            // Holding for ~200ms clears the threshold on macOS hosts
+            // tested without being noticeably laggy. Linux/Windows hosts
+            // toggle on the release regardless of duration, so this is
+            // safe across hosts.
             let down = HIDRPCMessage.keypressReport(key: usbHID, pressed: true)
             let up = HIDRPCMessage.keypressReport(key: usbHID, pressed: false)
             Task {
                 await webrtc.sendHID(down, on: .reliable)
+                try? await Task.sleep(for: .milliseconds(200))
                 await webrtc.sendHID(up, on: .reliable)
             }
             return

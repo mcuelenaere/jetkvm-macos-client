@@ -13,6 +13,8 @@ public enum SessionError: Error, Sendable {
     case deviceTooOld
     /// The signaling WS sent something other than device-metadata first.
     case unexpectedFirstMessage(String)
+    /// Tried to make an RPC call before the rpc data channel opened.
+    case rpcNotReady
     case underlying(Error)
 }
 
@@ -60,6 +62,20 @@ public final class Session {
     /// The JSON-RPC 2.0 client over the `rpc` data channel. Available
     /// once the connection is up; nil before connect / after disconnect.
     public private(set) var rpc: JSONRPCClient?
+
+    // MARK: - Cached control-plane state
+    //
+    // Populated on rpc-ready by a one-shot `refreshControlState()`
+    // call, and updated optimistically when the user changes a value
+    // via setStreamQualityFactor / setVideoCodecPreference. Server-
+    // pushed events (M3 commit 18) refresh the time-varying ones
+    // (videoState, usbState, atxState).
+
+    public internal(set) var videoState: VideoState?
+    public internal(set) var usbState: String?
+    public internal(set) var atxState: ATXState?
+    public internal(set) var streamQualityFactor: Double?
+    public internal(set) var videoCodecPreference: VideoCodecPreference?
 
     private var endpoint: DeviceEndpoint?
     private var http: HTTPClient?
@@ -337,10 +353,15 @@ public final class Session {
             }
         })
 
-        // 7. Track rpc channel open/closed state.
+        // 7. Track rpc channel open/closed state. On the first transition
+        //    to ready, fetch the initial control-plane state so the UI
+        //    has something to bind to before any server events arrive.
         pumpTasks.append(Task { @MainActor [weak self] in
             for await ready in await webrtc.rpcReadyState {
                 self?.rpcReady = ready
+                if ready {
+                    await self?.refreshControlState()
+                }
             }
         })
     }
@@ -398,6 +419,11 @@ public final class Session {
         videoTrack = nil
         hidReady = false
         rpcReady = false
+        videoState = nil
+        usbState = nil
+        atxState = nil
+        streamQualityFactor = nil
+        videoCodecPreference = nil
         modifierTracker.reset()
         pointerThrottler.reset()
     }

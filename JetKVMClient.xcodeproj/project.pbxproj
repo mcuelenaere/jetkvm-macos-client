@@ -15,6 +15,7 @@
 		D600000000000000000000D6 /* KVMWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C500000000000000000000C5 /* KVMWindowView.swift */; };
 		D700000000000000000000D7 /* KVMVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C600000000000000000000C6 /* KVMVideoView.swift */; };
 		D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C700000000000000000000C7 /* KeyboardCapturer.swift */; };
+		D900000000000000000000D9 /* ControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C800000000000000000000C8 /* ControlPanel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +26,7 @@
 		C500000000000000000000C5 /* KVMWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMWindowView.swift; sourceTree = "<group>"; };
 		C600000000000000000000C6 /* KVMVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMVideoView.swift; sourceTree = "<group>"; };
 		C700000000000000000000C7 /* KeyboardCapturer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCapturer.swift; sourceTree = "<group>"; };
+		C800000000000000000000C8 /* ControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlPanel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +60,7 @@
 				C500000000000000000000C5 /* KVMWindowView.swift */,
 				C600000000000000000000C6 /* KVMVideoView.swift */,
 				C700000000000000000000C7 /* KeyboardCapturer.swift */,
+				C800000000000000000000C8 /* ControlPanel.swift */,
 				C200000000000000000000C2 /* Info.plist */,
 			);
 			path = App;
@@ -164,6 +167,7 @@
 				D600000000000000000000D6 /* KVMWindowView.swift in Sources */,
 				D700000000000000000000D7 /* KVMVideoView.swift in Sources */,
 				D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */,
+				D900000000000000000000D9 /* ControlPanel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

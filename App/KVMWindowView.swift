@@ -5,6 +5,7 @@ import WebRTC
 struct KVMWindowView: View {
     @Environment(Session.self) private var session
     @State private var capturer = KeyboardCapturer()
+    @State private var showControls = false
 
     private var captureToggleBinding: Binding<Bool> {
         Binding(
@@ -18,28 +19,31 @@ struct KVMWindowView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            if let track = session.videoTrack {
-                KVMVideoRepresentable(track: track, session: session)
-            } else {
-                ProgressView("Waiting for video…")
-                    .controlSize(.large)
-                    .foregroundStyle(.white)
-            }
-            // Banner when capture mode is requested but Accessibility
-            // permission still needs to be granted.
-            if case .awaitingAccessibility = capturer.state {
-                VStack {
-                    Text("Grant Accessibility permission to capture system shortcuts (Cmd+Tab, Cmd+Space, …), then click Capture again.")
-                        .padding(8)
-                        .background(.yellow)
-                        .foregroundStyle(.black)
-                        .cornerRadius(6)
-                        .padding()
-                    Spacer()
+        VStack(spacing: 0) {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                if let track = session.videoTrack {
+                    KVMVideoRepresentable(track: track, session: session)
+                } else {
+                    ProgressView("Waiting for video…")
+                        .controlSize(.large)
+                        .foregroundStyle(.white)
+                }
+                // Banner when capture mode is requested but Accessibility
+                // permission still needs to be granted.
+                if case .awaitingAccessibility = capturer.state {
+                    VStack {
+                        Text("Grant Accessibility permission to capture system shortcuts (Cmd+Tab, Cmd+Space, …), then click Capture again.")
+                            .padding(8)
+                            .background(.yellow)
+                            .foregroundStyle(.black)
+                            .cornerRadius(6)
+                            .padding()
+                        Spacer()
+                    }
                 }
             }
+            StatusStrip()
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -55,6 +59,19 @@ struct KVMWindowView: View {
                 }
                 .toggleStyle(.button)
                 .help("Forward Cmd+Tab, Cmd+Space, and other system-grabbed shortcuts to the host. Requires Accessibility permission.")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showControls.toggle()
+                } label: {
+                    Label("Controls", systemImage: "slider.horizontal.3")
+                }
+                .popover(isPresented: $showControls, arrowEdge: .top) {
+                    ControlPanel()
+                        .environment(session)
+                }
+                .disabled(!session.rpcReady)
+                .help("Power, codec, and quality controls.")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Disconnect") {

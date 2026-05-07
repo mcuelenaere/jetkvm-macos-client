@@ -1,0 +1,27 @@
+## Briefing — kept locally as protocol reference, not in git history
+BRIEFING.md
+
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+## Xcode user-specific data
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+DerivedData/
+
+## Swift Package Manager
+.build/
+Package.resolved
+.swiftpm/
+
+## Build products
+build/
+*.app
+*.dSYM
+*.dSYM.zip
+
+## Tooling
+.claude/

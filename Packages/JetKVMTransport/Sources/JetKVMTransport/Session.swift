@@ -381,6 +381,9 @@ public final class Session {
     }
 
     private func handleRPCNotification(_ n: JSONRPCNotification) {
+        // Important: only assign on decode success. `try?` here
+        // would clobber existing state with nil on the first
+        // payload-shape mismatch.
         switch n.method {
         case "otherSessionConnected":
             // Server sends this just before tearing down our peer
@@ -390,17 +393,26 @@ public final class Session {
             state = .kicked
 
         case "videoInputState":
-            videoState = try? n.decodeParams(VideoState.self)
+            if let v = try? n.decodeParams(VideoState.self) {
+                videoState = v
+            }
 
         case "usbState":
-            // Wire shape is a bare JSON string ("connected", "disconnected", …).
-            usbState = try? n.decodeParams(String.self)
+            // Wire shape is a bare JSON string ("configured",
+            // "connected", "disconnected", …).
+            if let s = try? n.decodeParams(String.self) {
+                usbState = s
+            }
 
         case "atxState":
-            atxState = try? n.decodeParams(ATXState.self)
+            if let a = try? n.decodeParams(ATXState.self) {
+                atxState = a
+            }
 
         case "failsafeMode":
-            failsafe = try? n.decodeParams(FailsafeModeNotification.self)
+            if let f = try? n.decodeParams(FailsafeModeNotification.self) {
+                failsafe = f
+            }
 
         default:
             // Unhandled events (otaState, networkState, dcState,

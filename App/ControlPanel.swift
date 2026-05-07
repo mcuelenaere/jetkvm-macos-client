@@ -154,38 +154,72 @@ struct ControlPanel: View {
     }
 }
 
-/// Compact single-line strip showing video + USB state. Lives at
-/// the bottom of the KVM window so the user has ambient awareness
-/// of the connection without opening the controls popover.
+/// Compact single-line strip showing the host video + USB state at
+/// the bottom of the KVM window. Each segment is only rendered when
+/// we have data to show — empty segments collapse rather than
+/// rendering a "Loading…" placeholder.
 struct StatusStrip: View {
     @Environment(Session.self) private var session
 
     var body: some View {
         HStack(spacing: 12) {
-            if let video = session.videoState {
-                Label {
-                    Text("\(video.width)×\(video.height) @ \(Int(video.fps.rounded())) fps")
-                        .monospacedDigit()
-                } icon: {
-                    Image(systemName: "display")
-                }
-                if let err = video.error, !err.isEmpty {
-                    Text(err.replacingOccurrences(of: "_", with: " "))
-                        .foregroundStyle(.red)
-                }
-            } else {
-                Text("Video: …")
-                    .foregroundStyle(.secondary)
-            }
+            videoSection
             Spacer()
-            if let usb = session.usbState {
-                Label(usb, systemImage: "cable.connector")
-                    .foregroundStyle(.secondary)
-            }
+            usbSection
         }
         .font(.caption)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.thinMaterial)
+    }
+
+    @ViewBuilder
+    private var videoSection: some View {
+        if let video = session.videoState {
+            HStack(spacing: 6) {
+                Image(systemName: "display")
+                // Text(verbatim:) bypasses LocalizedStringKey, which would
+                // otherwise insert the locale's thousand separator into
+                // 1920 / 1080.
+                Text(verbatim: "\(video.width)×\(video.height) \(Int(video.fps.rounded())) fps")
+                    .monospacedDigit()
+                // The canonical "is the host pipeline broken" signal is
+                // `error` (no_signal / no_lock / out_of_range per the
+                // server-side struct comment); `streaming` tracks a
+                // different internal state machine that doesn't always
+                // line up with whether frames are flowing.
+                if let err = video.error, !err.isEmpty {
+                    Text(err.replacingOccurrences(of: "_", with: " "))
+                        .foregroundStyle(.red)
+                }
+            }
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var usbSection: some View {
+        if let usb = session.usbState {
+            HStack(spacing: 6) {
+                Image(systemName: "cable.connector")
+                Text(verbatim: "USB \(friendlyUSBState(usb))")
+            }
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Map raw Linux UDC state strings to friendlier client-facing
+    /// labels. `configured` is the USB-spec "fully enumerated and
+    /// working" state — calling it "connected" matches the user's
+    /// mental model better than the kernel's vocabulary.
+    private func friendlyUSBState(_ raw: String) -> String {
+        switch raw {
+        case "configured": return "connected"
+        case "addressed", "default", "powered", "attached", "connected":
+            return "connecting"
+        case "suspended": return "suspended"
+        case "disconnected", "not attached": return "disconnected"
+        default: return raw
+        }
     }
 }

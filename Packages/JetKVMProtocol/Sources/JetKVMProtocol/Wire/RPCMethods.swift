@@ -40,12 +40,50 @@ public enum VideoCodecPreference: String, Codable, Sendable, CaseIterable {
 
 // MARK: - Video state
 
-/// Result of `getVideoState`. Mirrors `internal/native/video.go` —
-/// `streaming` is an enum on the server side but the wire type is a
-/// string so we treat it as one and don't enumerate values.
+/// Streaming state of the video pipeline. Wire format is `uint8`
+/// per `internal/native/native.go:47-53`. Modeled as an open enum so
+/// future server-side values don't crash decode.
+public enum VideoStreamingStatus: Sendable, Equatable {
+    case inactive
+    case active
+    case stopping
+    case unknown(UInt8)
+
+    public init(rawValue: UInt8) {
+        switch rawValue {
+        case 0: self = .inactive
+        case 1: self = .active
+        case 2: self = .stopping
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: UInt8 {
+        switch self {
+        case .inactive: return 0
+        case .active:   return 1
+        case .stopping: return 2
+        case .unknown(let v): return v
+        }
+    }
+}
+
+extension VideoStreamingStatus: Codable {
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(UInt8.self)
+        self = VideoStreamingStatus(rawValue: raw)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
+/// Result of `getVideoState`. Mirrors `internal/native/video.go`.
 public struct VideoState: Codable, Sendable, Equatable {
     public let ready: Bool
-    public let streaming: String
+    public let streaming: VideoStreamingStatus
     public let error: String?
     public let width: Int
     public let height: Int
@@ -53,7 +91,7 @@ public struct VideoState: Codable, Sendable, Equatable {
 
     public init(
         ready: Bool,
-        streaming: String,
+        streaming: VideoStreamingStatus,
         error: String? = nil,
         width: Int,
         height: Int,

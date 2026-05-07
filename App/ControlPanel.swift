@@ -175,20 +175,33 @@ struct StatusStrip: View {
 
     @ViewBuilder
     private var videoSection: some View {
-        if let video = session.videoState {
+        if session.videoState != nil || session.latestStats != nil {
             HStack(spacing: 6) {
                 Image(systemName: "display")
-                // Text(verbatim:) bypasses LocalizedStringKey, which would
-                // otherwise insert the locale's thousand separator into
-                // 1920 / 1080.
-                Text(verbatim: "\(video.width)×\(video.height) \(Int(video.fps.rounded())) fps")
-                    .monospacedDigit()
-                // The canonical "is the host pipeline broken" signal is
-                // `error` (no_signal / no_lock / out_of_range per the
-                // server-side struct comment); `streaming` tracks a
-                // different internal state machine that doesn't always
-                // line up with whether frames are flowing.
-                if let err = video.error, !err.isEmpty {
+                // Resolution from getVideoState (host's HDMI capture).
+                // Text(verbatim:) bypasses LocalizedStringKey, which
+                // would otherwise insert locale thousand separators
+                // into 1920 / 1080.
+                if let video = session.videoState {
+                    Text(verbatim: "\(video.width)×\(video.height)")
+                        .monospacedDigit()
+                }
+                // Decoded FPS from WebRTC stats. Different from
+                // videoState.fps (host's HDMI rate) — the stats one
+                // reflects actual delivery to our decoder, which is
+                // the user-feel "is video smooth right now" number.
+                if let stats = session.latestStats, stats.framesPerSecond > 0 {
+                    Text(verbatim: "\(Int(stats.framesPerSecond.rounded())) fps")
+                        .monospacedDigit()
+                }
+                // Live RTT from the active ICE candidate pair.
+                if let rtt = session.latestStats?.roundTripTimeMs {
+                    Text(verbatim: "\(Int(rtt.rounded()))ms")
+                        .monospacedDigit()
+                }
+                // Error string ("no_signal", "no_lock", …) only when
+                // the JetKVM is reporting one.
+                if let err = session.videoState?.error, !err.isEmpty {
                     Text(err.replacingOccurrences(of: "_", with: " "))
                         .foregroundStyle(.red)
                 }

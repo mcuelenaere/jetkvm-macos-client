@@ -99,6 +99,10 @@ public final class Session {
     private var pumpTasks: [Task<Void, Never>] = []
     private var modifierTracker = ModifierTracker()
     private var pointerThrottler = InputThrottler(interval: .milliseconds(8))
+    /// USB-HID Usage IDs of non-modifier keys we believe are held on
+    /// the host. Combined with `modifierTracker.currentState` it tells
+    /// the keep-alive loop whether to fire a heartbeat.
+    private var heldNonModifierKeys: Set<UInt8> = []
 
     public init() {}
 
@@ -208,6 +212,11 @@ public final class Session {
     public func sendKeypress(virtualKeyCode keyCode: UInt16, pressed: Bool) {
         guard hidReady, let webrtc else { return }
         guard let usbHID = KeyMap.virtualKeyToHIDUsageID[keyCode] else { return }
+        if pressed {
+            heldNonModifierKeys.insert(usbHID)
+        } else {
+            heldNonModifierKeys.remove(usbHID)
+        }
         let message = HIDRPCMessage.keypressReport(key: usbHID, pressed: pressed)
         Task { await webrtc.sendHID(message, on: .reliable) }
     }
@@ -260,6 +269,7 @@ public final class Session {
     public func releaseAllHeldModifiers() {
         guard let webrtc else {
             modifierTracker.reset()
+            heldNonModifierKeys.removeAll()
             return
         }
         let allBits: [ModifierBits] = [
@@ -275,6 +285,12 @@ public final class Session {
             }
         }
         modifierTracker.reset()
+        // Note: heldNonModifierKeys are intentionally NOT released
+        // here — onSuspend fires only on focus loss while in capture
+        // mode, which is a "modifiers might be stuck" failure mode
+        // specific to held-mid-keystroke modifiers. Regular keys
+        // surfaced via NSView keyUp on focus return.
+        heldNonModifierKeys.removeAll()
     }
 
     /// Forward continuous mouse motion (mouseMoved / mouseDragged).
@@ -414,6 +430,30 @@ public final class Session {
                 self?.appendStatsSample(sample)
             }
         })
+
+        // 10. KeypressKeepAlive heartbeat — fires every 50ms on the
+        //     reliable HID channel for as long as any key is held.
+        //     The JetKVM gadget driver auto-releases held keys after
+        //     ~100ms of no HID traffic; the keep-alive fills any gap
+        //     in repeat events so e.g. Shift+drag doesn't release the
+        //     modifier after a few seconds. Mirrors the TS UI's
+        //     KEEPALIVE_INTERVAL constant in useKeyboard.ts.
+        pumpTasks.append(Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(50))
+                guard let self else { return }
+                if self.anyKeyHeld, self.hidReady, let webrtc = self.webrtc {
+                    await webrtc.sendHID(.keypressKeepAliveReport, on: .reliable)
+                }
+            }
+        })
+    }
+
+    /// True when at least one key (modifier or regular) is reported
+    /// to the host as held. The keep-alive heartbeat runs only while
+    /// this is true.
+    private var anyKeyHeld: Bool {
+        !heldNonModifierKeys.isEmpty || !modifierTracker.currentState.isEmpty
     }
 
     private func appendStatsSample(_ sample: ConnectionStats) {
@@ -536,6 +576,7 @@ public final class Session {
         statsHistory = []
         modifierTracker.reset()
         pointerThrottler.reset()
+        heldNonModifierKeys.removeAll()
     }
 }
 

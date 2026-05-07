@@ -60,6 +60,7 @@ public final class Session {
     private var webrtc: WebRTCFacade?
     private var pumpTasks: [Task<Void, Never>] = []
     private var modifierTracker = ModifierTracker()
+    private var pointerThrottler = InputThrottler(interval: .milliseconds(8))
 
     public init() {}
 
@@ -171,6 +172,32 @@ public final class Session {
         guard let usbHID = transition.modifier.usbHIDUsageID else { return }
         let message = HIDRPCMessage.keypressReport(key: usbHID, pressed: transition.pressed)
         Task { await webrtc.sendHID(message, on: .reliable) }
+    }
+
+    /// Forward continuous mouse motion (mouseMoved / mouseDragged).
+    /// Throttled to ~120 Hz at the InputThrottler — under congestion,
+    /// dropping a stale absolute position is better than queueing it.
+    public func sendPointerMotion(normalizedX: Int32, normalizedY: Int32, buttons: MouseButtons) {
+        guard hidReady else { return }
+        guard pointerThrottler.shouldEmit() else { return }
+        sendPointerReport(x: normalizedX, y: normalizedY, buttons: buttons)
+    }
+
+    /// Forward a discrete mouse-button transition (mouseDown / mouseUp
+    /// for left/right/middle/back/forward). Bypasses the throttler so
+    /// down/up pairs always reach the host even if a motion event was
+    /// just throttled out, and resets the throttler so the next motion
+    /// event doesn't get dropped immediately after a click.
+    public func sendPointerButtonChange(normalizedX: Int32, normalizedY: Int32, buttons: MouseButtons) {
+        guard hidReady else { return }
+        pointerThrottler.reset()
+        sendPointerReport(x: normalizedX, y: normalizedY, buttons: buttons)
+    }
+
+    private func sendPointerReport(x: Int32, y: Int32, buttons: MouseButtons) {
+        guard let webrtc else { return }
+        let message = HIDRPCMessage.pointerReport(x: x, y: y, buttons: buttons.rawValue)
+        Task { await webrtc.sendHID(message, on: .unreliableOrdered) }
     }
 
     // MARK: - Internal pumps
@@ -285,6 +312,7 @@ public final class Session {
         videoTrack = nil
         hidReady = false
         modifierTracker.reset()
+        pointerThrottler.reset()
     }
 }
 

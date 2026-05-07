@@ -1,4 +1,5 @@
 import AppKit
+import JetKVMProtocol
 import JetKVMTransport
 import WebRTC
 
@@ -63,16 +64,21 @@ final class KVMVideoView: NSView {
         return view
     }
 
-    // MARK: - First responder
+    // MARK: - First responder + coordinate system
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// Use top-left origin so view-local coordinates match what the
+    /// host expects (0..32767 normalized with 0,0 in the top-left).
+    /// Without this, NSEvent.locationInWindow → view-local would have
+    /// bottom-left origin and we'd have to flip Y manually.
+    override var isFlipped: Bool { true }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        // Become first responder so keyDown/keyUp/flagsChanged events
-        // arrive here. mouseMoved delivery requires the window opt-in
-        // (commit 14 will rely on this).
         window?.makeFirstResponder(self)
+        // Required for mouseMoved delivery. Without this NSWindow only
+        // dispatches mouse-button events, not bare-cursor motion.
         window?.acceptsMouseMovedEvents = true
     }
 
@@ -104,5 +110,47 @@ final class KVMVideoView: NSView {
         guard session != nil else { return false }
         return false  // CGEventTap "Capture Keyboard" mode in M4 will
                       // be the path that swallows these.
+    }
+
+    // MARK: - Mouse events
+
+    override func mouseMoved(with event: NSEvent) { sendPointer(event: event, motion: true) }
+    override func mouseDragged(with event: NSEvent) { sendPointer(event: event, motion: true) }
+    override func rightMouseDragged(with event: NSEvent) { sendPointer(event: event, motion: true) }
+    override func otherMouseDragged(with event: NSEvent) { sendPointer(event: event, motion: true) }
+
+    override func mouseDown(with event: NSEvent) { sendPointer(event: event, motion: false) }
+    override func mouseUp(with event: NSEvent) { sendPointer(event: event, motion: false) }
+    override func rightMouseDown(with event: NSEvent) { sendPointer(event: event, motion: false) }
+    override func rightMouseUp(with event: NSEvent) { sendPointer(event: event, motion: false) }
+    override func otherMouseDown(with event: NSEvent) { sendPointer(event: event, motion: false) }
+    override func otherMouseUp(with event: NSEvent) { sendPointer(event: event, motion: false) }
+
+    private func sendPointer(event: NSEvent, motion: Bool) {
+        guard let session else { return }
+        guard let coords = normalizedCoords(event: event) else { return }
+        // NSEvent.pressedMouseButtons is a class property giving the
+        // global currently-pressed-buttons bitmask. Lower 5 bits map
+        // 1:1 to JetKVM's MouseButtons (left/right/middle/back/forward).
+        let buttons = MouseButtons(rawValue: UInt8(truncatingIfNeeded: NSEvent.pressedMouseButtons))
+        if motion {
+            session.sendPointerMotion(normalizedX: coords.x, normalizedY: coords.y, buttons: buttons)
+        } else {
+            session.sendPointerButtonChange(normalizedX: coords.x, normalizedY: coords.y, buttons: buttons)
+        }
+    }
+
+    /// View-local coordinates → 0..32767 normalized over view bounds.
+    /// Returns nil if the view has zero area (rare; defensive).
+    private func normalizedCoords(event: NSEvent) -> (x: Int32, y: Int32)? {
+        guard bounds.width > 0, bounds.height > 0 else { return nil }
+        let local = convert(event.locationInWindow, from: nil)
+        // Clamp — NSEvent can deliver mouseMoved with the cursor a hair
+        // outside the view bounds during fast motion.
+        let clampedX = max(0, min(bounds.width, local.x))
+        let clampedY = max(0, min(bounds.height, local.y))
+        let nx = Int32(clampedX / bounds.width * 32767)
+        let ny = Int32(clampedY / bounds.height * 32767)
+        return (nx, ny)
     }
 }

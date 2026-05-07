@@ -64,7 +64,7 @@ struct StatsPanel: View {
                 section("Latency") {
                     grid {
                         MetricCard(
-                            title: "End-to-end",
+                            title: "Input latency",
                             value: latest?.endToEndLatencyMs.map { "\(Int($0.rounded())) ms" } ?? "—",
                             samples: history,
                             sample: { $0.endToEndLatencyMs },
@@ -123,6 +123,12 @@ struct StatsPanel: View {
             Badge(
                 label: "Codec",
                 value: latest?.codec.flatMap(codecLabel) ?? "—",
+                tint: .secondary
+            )
+            Badge(
+                label: "Quality",
+                value: session.streamQualityFactor
+                    .map { String(format: "%.0f%%", $0 * 100) } ?? "—",
                 tint: .secondary
             )
         }

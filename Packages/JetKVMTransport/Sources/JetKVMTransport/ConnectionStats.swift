@@ -71,10 +71,15 @@ public struct ConnectionStats: Sendable, Equatable {
     /// sample's interval, milliseconds. nil on first sample.
     public let playbackDelayMs: Double?
 
-    /// Composite "glass-to-glass" latency estimate: half the RTT
-    /// (one-way) plus current jitter-buffer delay plus current
-    /// decode time. The metric users actually feel as
-    /// "responsiveness". nil if any component is missing.
+    /// Composite input-latency estimate — the lower bound on what
+    /// the user feels between moving the mouse and seeing the host
+    /// respond: full RTT (input round-trips client → JetKVM → host
+    /// → frame back → client) plus jitter-buffer delay plus decode
+    /// time. Doesn't account for the host's display refresh,
+    /// JetKVM's HDMI capture, or its encode time — those aren't
+    /// exposed to us, so the real number is somewhere ~30-50 ms
+    /// higher. Surfaced in the UI as "Input latency". nil if any
+    /// measurable component is missing.
     public let endToEndLatencyMs: Double?
 
     // MARK: - Session totals

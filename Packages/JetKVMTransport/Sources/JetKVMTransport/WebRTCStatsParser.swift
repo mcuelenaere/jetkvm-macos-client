@@ -108,13 +108,17 @@ struct WebRTCStatsParser {
             return (deltaSeconds / Double(deltaCount)) * 1000
         }()
 
-        // Composite end-to-end latency: one-way network + buffer + decode.
+        // Composite input-latency estimate: full RTT (input goes
+        // there, frame comes back) + jitter buffer + decode.
+        // Lower bound — the host's display refresh and JetKVM's
+        // capture+encode aren't observable, so reality is ~30-50 ms
+        // worse. Always > RTT.
         let endToEndLatencyMs: Double? = {
             guard let rtt = roundTripTimeMs,
                   let buf = playbackDelayMs,
                   let dec = decodeTimePerFrameMs
             else { return nil }
-            return rtt / 2 + buf + dec
+            return rtt + buf + dec
         }()
 
         previousBytesReceived = bytesReceivedTotal

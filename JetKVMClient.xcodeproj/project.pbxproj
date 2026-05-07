@@ -14,6 +14,7 @@
 		D500000000000000000000D5 /* ConnectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C400000000000000000000C4 /* ConnectView.swift */; };
 		D600000000000000000000D6 /* KVMWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C500000000000000000000C5 /* KVMWindowView.swift */; };
 		D700000000000000000000D7 /* KVMVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C600000000000000000000C6 /* KVMVideoView.swift */; };
+		D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C700000000000000000000C7 /* KeyboardCapturer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +24,7 @@
 		C400000000000000000000C4 /* ConnectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectView.swift; sourceTree = "<group>"; };
 		C500000000000000000000C5 /* KVMWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMWindowView.swift; sourceTree = "<group>"; };
 		C600000000000000000000C6 /* KVMVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMVideoView.swift; sourceTree = "<group>"; };
+		C700000000000000000000C7 /* KeyboardCapturer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCapturer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +57,7 @@
 				C400000000000000000000C4 /* ConnectView.swift */,
 				C500000000000000000000C5 /* KVMWindowView.swift */,
 				C600000000000000000000C6 /* KVMVideoView.swift */,
+				C700000000000000000000C7 /* KeyboardCapturer.swift */,
 				C200000000000000000000C2 /* Info.plist */,
 			);
 			path = App;
@@ -160,6 +163,7 @@
 				D500000000000000000000D5 /* ConnectView.swift in Sources */,
 				D600000000000000000000D6 /* KVMWindowView.swift in Sources */,
 				D700000000000000000000D7 /* KVMVideoView.swift in Sources */,
+				D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

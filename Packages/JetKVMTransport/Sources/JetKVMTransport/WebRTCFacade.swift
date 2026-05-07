@@ -4,6 +4,7 @@ import WebRTC
 
 public enum WebRTCFacadeError: Error, Sendable {
     case peerConnectionCreationFailed
+    case dataChannelCreationFailed(label: String)
     case offerCreationFailed(String)
     case sessionDescriptionCodecFailure(String)
     case setLocalDescriptionFailed(String)
@@ -11,6 +12,15 @@ public enum WebRTCFacadeError: Error, Sendable {
     case addIceCandidateFailed(String)
     case alreadyStarted
     case notStarted
+}
+
+/// Which transport channel an outgoing HID-RPC message should ride on.
+/// Per `BRIEFING.md`: keyboard reports + handshake go reliable, pointer
+/// and mouse reports go unreliable-ordered (under congestion, dropping
+/// stale absolute coords is better than queueing).
+public enum HIDChannel: Sendable {
+    case reliable          // "hidrpc"
+    case unreliableOrdered // "hidrpc-unreliable-ordered"
 }
 
 /// High-level connection state surfaced to the UI / Session actor. Wraps the
@@ -39,14 +49,28 @@ public actor WebRTCFacade {
     private let factory: RTCPeerConnectionFactory
     private var peerConnection: RTCPeerConnection?
     private var delegate: PeerDelegate?
+    private var hidrpcReliable: RTCDataChannel?
+    private var hidrpcUnreliableOrdered: RTCDataChannel?
+    private var hidDataChannelDelegate: HIDDataChannelDelegate?
 
     public let localIceCandidates: AsyncStream<IceCandidate>
     public let videoTracks: AsyncStream<RTCVideoTrack>
     public let connectionState: AsyncStream<WebRTCConnectionState>
+    /// Stream of incoming HID-RPC messages from the device (LED state,
+    /// keydown state, macro state, …). Only the reliable channel
+    /// realistically receives — server-pushed updates are all on
+    /// `hidrpc`.
+    public let incomingHID: AsyncStream<HIDRPCMessage>
+    /// Reflects the open/closed state of the reliable `hidrpc` channel.
+    /// `true` means we've sent the handshake and the channel is ready to
+    /// carry input.
+    public let hidReadyState: AsyncStream<Bool>
 
     private let localIceCandidatesContinuation: AsyncStream<IceCandidate>.Continuation
     private let videoTracksContinuation: AsyncStream<RTCVideoTrack>.Continuation
     private let connectionStateContinuation: AsyncStream<WebRTCConnectionState>.Continuation
+    private let incomingHIDContinuation: AsyncStream<HIDRPCMessage>.Continuation
+    private let hidReadyStateContinuation: AsyncStream<Bool>.Continuation
 
     public init() {
         // RTCDefaultVideoEncoderFactory / RTCDefaultVideoDecoderFactory ship
@@ -70,6 +94,14 @@ public actor WebRTCFacade {
         var stateCont: AsyncStream<WebRTCConnectionState>.Continuation!
         self.connectionState = AsyncStream<WebRTCConnectionState> { stateCont = $0 }
         self.connectionStateContinuation = stateCont
+
+        var hidCont: AsyncStream<HIDRPCMessage>.Continuation!
+        self.incomingHID = AsyncStream<HIDRPCMessage> { hidCont = $0 }
+        self.incomingHIDContinuation = hidCont
+
+        var readyCont: AsyncStream<Bool>.Continuation!
+        self.hidReadyState = AsyncStream<Bool> { readyCont = $0 }
+        self.hidReadyStateContinuation = readyCont
     }
 
     /// Create the peer connection, add a single recvonly video transceiver,
@@ -110,6 +142,36 @@ public actor WebRTCFacade {
         let transceiverInit = RTCRtpTransceiverInit()
         transceiverInit.direction = .recvOnly
         _ = pc.addTransceiver(of: .video, init: transceiverInit)
+
+        // Open the HID data channels BEFORE creating the offer so they
+        // appear in the offer SDP. The server's dispatch is keyed on
+        // channel label (`webrtc.go:382-414`); reliability options
+        // matter only for client-side transport behaviour.
+        let hidDelegate = HIDDataChannelDelegate(
+            incomingContinuation: incomingHIDContinuation,
+            readyStateContinuation: hidReadyStateContinuation
+        )
+        self.hidDataChannelDelegate = hidDelegate
+
+        let reliableConfig = RTCDataChannelConfiguration()
+        reliableConfig.isOrdered = true
+        guard let reliable = pc.dataChannel(forLabel: "hidrpc", configuration: reliableConfig) else {
+            throw WebRTCFacadeError.dataChannelCreationFailed(label: "hidrpc")
+        }
+        reliable.delegate = hidDelegate
+        self.hidrpcReliable = reliable
+
+        let unreliableConfig = RTCDataChannelConfiguration()
+        unreliableConfig.isOrdered = true
+        unreliableConfig.maxRetransmits = 0
+        guard let unreliable = pc.dataChannel(
+            forLabel: "hidrpc-unreliable-ordered",
+            configuration: unreliableConfig
+        ) else {
+            throw WebRTCFacadeError.dataChannelCreationFailed(label: "hidrpc-unreliable-ordered")
+        }
+        unreliable.delegate = hidDelegate
+        self.hidrpcUnreliableOrdered = unreliable
 
         // Create the offer.
         let offerConstraints = RTCMediaConstraints(
@@ -153,13 +215,33 @@ public actor WebRTCFacade {
         }
     }
 
+    /// Send a HID-RPC message on the chosen channel. Best-effort — for
+    /// the unreliable channel a dropped frame is the intended behaviour;
+    /// for the reliable channel SCTP retransmits until the channel
+    /// closes.
+    public func sendHID(_ message: HIDRPCMessage, on channel: HIDChannel) {
+        let target: RTCDataChannel?
+        switch channel {
+        case .reliable:          target = hidrpcReliable
+        case .unreliableOrdered: target = hidrpcUnreliableOrdered
+        }
+        guard let target else { return }
+        let buffer = RTCDataBuffer(data: message.wireFormat, isBinary: true)
+        _ = target.sendData(buffer)
+    }
+
     public func close() async {
         peerConnection?.close()
         peerConnection = nil
         delegate = nil
+        hidrpcReliable = nil
+        hidrpcUnreliableOrdered = nil
+        hidDataChannelDelegate = nil
         localIceCandidatesContinuation.finish()
         videoTracksContinuation.finish()
         connectionStateContinuation.finish()
+        incomingHIDContinuation.finish()
+        hidReadyStateContinuation.finish()
     }
 
     // MARK: - SDP wire format
@@ -333,6 +415,65 @@ private final class PeerDelegate: NSObject, RTCPeerConnectionDelegate, @unchecke
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd rtpReceiver: RTCRtpReceiver, streams mediaStreams: [RTCMediaStream]) {
         if let track = rtpReceiver.track as? RTCVideoTrack {
             trackContinuation.yield(track)
+        }
+    }
+}
+
+/// Delegate handling state and incoming messages for the HID data
+/// channels. Both `hidrpc` and `hidrpc-unreliable-ordered` share this
+/// instance.
+///
+/// Critical: when `hidrpc` opens, this delegate sends the HID-RPC
+/// handshake (`[0x01, 0x01]`) **synchronously** inside the
+/// `didChangeState` callback, before any `await` or `Task` switch.
+/// The server gates `Session.hidRPCAvailable` on receiving this
+/// handshake (`hidrpc.go:28`); any HID input sent before it lands is
+/// silently dropped.
+private final class HIDDataChannelDelegate: NSObject, RTCDataChannelDelegate, @unchecked Sendable {
+    let incomingContinuation: AsyncStream<HIDRPCMessage>.Continuation
+    let readyStateContinuation: AsyncStream<Bool>.Continuation
+
+    init(
+        incomingContinuation: AsyncStream<HIDRPCMessage>.Continuation,
+        readyStateContinuation: AsyncStream<Bool>.Continuation
+    ) {
+        self.incomingContinuation = incomingContinuation
+        self.readyStateContinuation = readyStateContinuation
+    }
+
+    func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) {
+        // Only the reliable channel triggers handshake + ready signal.
+        // The unreliable channel is just a transport — when it opens it's
+        // ready to ship pointer reports immediately, but the server still
+        // requires the reliable handshake before acting on anything.
+        guard dataChannel.label == "hidrpc" else { return }
+        switch dataChannel.readyState {
+        case .open:
+            // Send handshake synchronously here. Don't `Task { ... }` it —
+            // see class doc comment.
+            let buffer = RTCDataBuffer(
+                data: HIDRPCMessage.standardHandshake.wireFormat,
+                isBinary: true
+            )
+            _ = dataChannel.sendData(buffer)
+            readyStateContinuation.yield(true)
+        case .closing, .closed:
+            readyStateContinuation.yield(false)
+        case .connecting:
+            break
+        @unknown default:
+            break
+        }
+    }
+
+    func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
+        guard buffer.isBinary else { return }
+        do {
+            let message = try HIDRPCMessage(wireFormat: buffer.data)
+            incomingContinuation.yield(message)
+        } catch {
+            // Drop unparseable frames — surfacing them as errors would
+            // tear down the stream and there's nothing the caller can do.
         }
     }
 }

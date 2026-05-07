@@ -6,6 +6,7 @@ struct KVMWindowView: View {
     @Environment(Session.self) private var session
     @State private var capturer = KeyboardCapturer()
     @State private var showControls = false
+    @State private var showStats = false
 
     private var captureToggleBinding: Binding<Bool> {
         Binding(
@@ -85,6 +86,18 @@ struct KVMWindowView: View {
                 }
                 .disabled(!session.rpcReady)
                 .help("Power, codec, and quality controls.")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showStats.toggle()
+                } label: {
+                    Label("Stats", systemImage: "chart.line.uptrend.xyaxis")
+                }
+                .popover(isPresented: $showStats, arrowEdge: .top) {
+                    StatsPanel()
+                        .environment(session)
+                }
+                .help("Live network and video diagnostics.")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Disconnect") {

@@ -47,17 +47,6 @@ struct HostsView: View {
                 }
                 .help("Add a new host.")
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    if let id = selection, let host = store.find(id: id) {
-                        connect(host)
-                    }
-                } label: {
-                    Label("Connect", systemImage: "arrow.right.circle")
-                }
-                .disabled(selection == nil)
-                .help("Connect to the selected host.")
-            }
         }
         .sheet(isPresented: $showingAdd) {
             HostFormSheet(mode: .add) { host in
@@ -111,7 +100,7 @@ private struct HostRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(host.displayName)
                     .font(.body)
-                Text(verbatim: "\(host.useTLS ? "https" : "http")://\(host.host):\(host.port)")
+                Text(verbatim: host.urlString)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

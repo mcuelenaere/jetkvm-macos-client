@@ -5,6 +5,11 @@ import SwiftUI
 /// (existing). The modal returns through a callback closure rather
 /// than via Bindings so the host's edits stay isolated until the
 /// user explicitly confirms.
+///
+/// One URL field stands in for host/port/TLS — the user types
+/// either a URL ("https://kvm.local:8443") or a bare hostname
+/// ("kvm.local") and we parse it on save. The bare-hostname path
+/// defaults to http/80 since that's the JetKVM LAN case.
 struct HostFormSheet: View {
     enum Mode {
         case add
@@ -18,9 +23,7 @@ struct HostFormSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String
-    @State private var host: String
-    @State private var port: String
-    @State private var useTLS: Bool
+    @State private var urlText: String
 
     init(
         mode: Mode,
@@ -33,14 +36,10 @@ struct HostFormSheet: View {
         switch mode {
         case .add:
             _name = State(initialValue: "")
-            _host = State(initialValue: "")
-            _port = State(initialValue: "80")
-            _useTLS = State(initialValue: false)
+            _urlText = State(initialValue: "")
         case .edit(let existing):
             _name = State(initialValue: existing.name)
-            _host = State(initialValue: existing.host)
-            _port = State(initialValue: String(existing.port))
-            _useTLS = State(initialValue: existing.useTLS)
+            _urlText = State(initialValue: existing.urlString)
         }
     }
 
@@ -58,10 +57,11 @@ struct HostFormSheet: View {
         }
     }
 
-    private var canSave: Bool {
-        !host.trimmingCharacters(in: .whitespaces).isEmpty &&
-        Int(port).map { $0 > 0 && $0 < 65_536 } == true
+    private var parsed: (host: String, port: Int, useTLS: Bool)? {
+        SavedHost.parse(urlText)
     }
+
+    private var canSave: Bool { parsed != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -70,15 +70,27 @@ struct HostFormSheet: View {
             Form {
                 TextField("Name (optional)", text: $name, prompt: Text("My desktop"))
                     .textFieldStyle(.roundedBorder)
-                TextField("Host", text: $host, prompt: Text("kvm.local or 192.168.1.42"))
-                    .textFieldStyle(.roundedBorder)
-                HStack {
-                    TextField("Port", text: $port)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 80)
-                    Toggle("HTTPS", isOn: $useTLS)
-                        .help("Only works against a JetKVM behind a reverse proxy with a real CA-issued certificate.")
-                }
+                TextField(
+                    "Address",
+                    text: $urlText,
+                    prompt: Text("https://kvm.local or kvm.local")
+                )
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                .textContentType(.URL)
+            }
+
+            if !urlText.isEmpty, parsed == nil {
+                Text("Enter a hostname or http(s) URL.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else if let parsed {
+                // Tiny inline echo of how we parsed it. Helps the user
+                // notice if they typed "https://" but actually wanted
+                // plain http (or vice-versa).
+                Text(verbatim: "→ \(parsed.useTLS ? "https" : "http")://\(parsed.host):\(parsed.port)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             HStack {
@@ -100,25 +112,24 @@ struct HostFormSheet: View {
     }
 
     private func save() {
-        guard let portValue = Int(port) else { return }
+        guard let parsed else { return }
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        let trimmedHost = host.trimmingCharacters(in: .whitespaces)
         let saved: SavedHost
         switch mode {
         case .add:
             saved = SavedHost(
                 name: trimmedName,
-                host: trimmedHost,
-                port: portValue,
-                useTLS: useTLS
+                host: parsed.host,
+                port: parsed.port,
+                useTLS: parsed.useTLS
             )
         case .edit(let existing):
             saved = SavedHost(
                 id: existing.id,
                 name: trimmedName,
-                host: trimmedHost,
-                port: portValue,
-                useTLS: useTLS
+                host: parsed.host,
+                port: parsed.port,
+                useTLS: parsed.useTLS
             )
         }
         onSave(saved)

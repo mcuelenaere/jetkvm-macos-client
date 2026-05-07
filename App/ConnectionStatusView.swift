@@ -51,7 +51,7 @@ struct ConnectionStatusView: View {
                 Spacer()
             }
 
-            Text(verbatim: "\(host.useTLS ? "https" : "http")://\(host.host):\(host.port)")
+            Text(verbatim: host.urlString)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 

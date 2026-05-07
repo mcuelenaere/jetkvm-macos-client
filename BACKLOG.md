@@ -5,6 +5,47 @@ to be picked up cold without re-litigating the original investigation.
 
 ---
 
+## mDNS device discovery (requires upstream JetKVM change)
+
+**Where (client):** new `App/DeviceDiscovery.swift` (or similar) using
+`NWBrowser(for: .bonjour(type: "_jetkvm._tcp", domain: nil), …)` on
+the connect screen. Each `NWBrowser.Result` would surface as a row
+in the device list with hostname + IP; the user picks one instead
+of typing the hostname.
+
+**Why blocked:** JetKVM uses `pion/mdns` purely as an mDNS responder
+— it answers A/AAAA queries for `jetkvm.local` (registered as a
+LocalName at `internal/mdns/mdns.go:134`) but does **not** broadcast
+a Bonjour PTR/SRV/TXT record for `_jetkvm._tcp`. Without that,
+`NWBrowser` returns zero results; there's nothing on the wire to
+discover. Hard-coded probing of likely hostnames (`jetkvm.local`,
+`kvm.local`, etc.) would work but is fragile and doesn't generalize
+to renamed devices.
+
+**Upstream fix sketch:** `internal/mdns/mdns.go` already initializes
+`pion_mdns.Server` with the device's local names. Adding service
+advertisement requires either:
+  1. Switching to a library that advertises Bonjour services
+     (e.g., `hashicorp/mdns` has `mdns.NewServer(*MDNSService)`
+     where `MDNSService` carries instance/service/host/port/TXT),
+     or
+  2. Manually publishing the PTR (`_jetkvm._tcp.local.` → instance),
+     SRV (instance → host:port), and TXT records via raw DNS-SD
+     records on the existing pion connection.
+
+Either way, the JetKVM web server's listener already knows its
+port (80 by default), so the SRV record is straightforward. TXT
+could carry firmware version / setup mode / capabilities — useful
+for the discovery UI to show "needs setup" or filter compatible
+versions.
+
+Once upstream advertises, our `NWBrowser` consumer is ~30 lines:
+hold a Set of results, render them in a `List` in `ConnectView`
+above the manual host field, on tap fill the host field +
+auto-connect.
+
+---
+
 ## Remove the explicit "Capture" toolbar toggle (auto-engage)
 
 **Where:** `App/KVMWindowView.swift` (toolbar item),

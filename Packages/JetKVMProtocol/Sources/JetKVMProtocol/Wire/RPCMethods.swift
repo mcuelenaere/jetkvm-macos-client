@@ -67,3 +67,19 @@ public struct VideoState: Codable, Sendable, Equatable {
         self.fps = fps
     }
 }
+
+// MARK: - Failsafe
+
+/// Payload of the `failsafeMode` server-pushed notification
+/// (`failsafe.go:26-29`). When `active` is true the device is in
+/// failsafe mode and the user should be alerted; `reason` is a
+/// human-readable string for the banner.
+public struct FailsafeModeNotification: Codable, Sendable, Equatable {
+    public let active: Bool
+    public let reason: String
+
+    public init(active: Bool, reason: String) {
+        self.active = active
+        self.reason = reason
+    }
+}

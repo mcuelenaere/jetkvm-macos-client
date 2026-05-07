@@ -29,19 +29,32 @@ struct KVMWindowView: View {
                         .controlSize(.large)
                         .foregroundStyle(.white)
                 }
-                // Banner when capture mode is requested but Accessibility
-                // permission still needs to be granted.
-                if case .awaitingAccessibility = capturer.state {
-                    VStack {
-                        Text("Grant Accessibility permission to capture system shortcuts (Cmd+Tab, Cmd+Space, …), then click Capture again.")
-                            .padding(8)
-                            .background(.yellow)
-                            .foregroundStyle(.black)
-                            .cornerRadius(6)
-                            .padding()
-                        Spacer()
+                // Stack of top-of-window banners. Most-severe first.
+                VStack(spacing: 8) {
+                    if case .kicked = session.state {
+                        banner(
+                            "Another peer connected to this device — your session was taken over.",
+                            background: .red,
+                            foreground: .white
+                        )
                     }
+                    if let failsafe = session.failsafe, failsafe.active {
+                        banner(
+                            "Device is in failsafe mode: \(failsafe.reason)",
+                            background: .red,
+                            foreground: .white
+                        )
+                    }
+                    if case .awaitingAccessibility = capturer.state {
+                        banner(
+                            "Grant Accessibility permission to capture system shortcuts (Cmd+Tab, Cmd+Space, …), then click Capture again.",
+                            background: .yellow,
+                            foreground: .black
+                        )
+                    }
+                    Spacer()
                 }
+                .padding()
             }
             StatusStrip()
         }
@@ -104,6 +117,18 @@ struct KVMWindowView: View {
         .onDisappear {
             capturer.disable()
         }
+    }
+
+    /// Top-of-window banner used for kicked / failsafe / accessibility
+    /// states. All read better as a pinned strip than a popup, so we
+    /// stack them at the top of the video view.
+    private func banner(_ text: String, background: Color, foreground: Color) -> some View {
+        Text(text)
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(background)
+            .foregroundStyle(foreground)
+            .cornerRadius(6)
     }
 }
 

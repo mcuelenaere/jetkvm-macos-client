@@ -76,6 +76,10 @@ public final class Session {
     public internal(set) var atxState: ATXState?
     public internal(set) var streamQualityFactor: Double?
     public internal(set) var videoCodecPreference: VideoCodecPreference?
+    /// Last-received failsafe mode notification. nil when the device
+    /// hasn't sent one yet; `.active == true` is the signal that the
+    /// device is in failsafe mode and the UI should warn the user.
+    public internal(set) var failsafe: FailsafeModeNotification?
 
     private var endpoint: DeviceEndpoint?
     private var http: HTTPClient?
@@ -364,6 +368,47 @@ public final class Session {
                 }
             }
         })
+
+        // 8. Server-pushed JSON-RPC notifications. The server fires
+        //    these without prompting (`webrtc.go:406-411` etc.) — most
+        //    update the cached control-plane state, otherSessionConnected
+        //    transitions us to `.kicked`.
+        pumpTasks.append(Task { @MainActor [weak self] in
+            for await notification in await rpc.notifications {
+                self?.handleRPCNotification(notification)
+            }
+        })
+    }
+
+    private func handleRPCNotification(_ n: JSONRPCNotification) {
+        switch n.method {
+        case "otherSessionConnected":
+            // Server sends this just before tearing down our peer
+            // connection (cloud.go:477, web.go:261). Show the kicked
+            // UI; .closed transitions stop overriding state.kicked
+            // (see handleRTCState).
+            state = .kicked
+
+        case "videoInputState":
+            videoState = try? n.decodeParams(VideoState.self)
+
+        case "usbState":
+            // Wire shape is a bare JSON string ("connected", "disconnected", …).
+            usbState = try? n.decodeParams(String.self)
+
+        case "atxState":
+            atxState = try? n.decodeParams(ATXState.self)
+
+        case "failsafeMode":
+            failsafe = try? n.decodeParams(FailsafeModeNotification.self)
+
+        default:
+            // Unhandled events (otaState, networkState, dcState,
+            // willReboot, keyboardLedState, etc.) — silently ignore
+            // for now; surface them when a feature actually needs
+            // them.
+            break
+        }
     }
 
     private func attachVideoTrack(_ track: RTCVideoTrack) {
@@ -377,13 +422,18 @@ public final class Session {
     private func handleRTCState(_ rtcState: WebRTCConnectionState) {
         switch rtcState {
         case .connected:
-            state = .connected
+            // Don't trample .kicked — that takes precedence visually
+            // even if the underlying RTC state is technically still
+            // connected for the second or so before the server tears
+            // us down.
+            if state != .kicked { state = .connected }
         case .failed:
             state = .failed("WebRTC connection failed")
         case .closed:
             // Closure may be initiated by us or by the server (e.g. after
-            // otherSessionConnected); we model the latter as `.kicked` once
-            // the JSON-RPC channel surfaces that event in M3.
+            // otherSessionConnected). When we're already .kicked, stay
+            // there so the user sees the kicked UI; the connection is
+            // gone but the state explains why.
             if case .connected = state {
                 state = .idle
             }
@@ -424,6 +474,7 @@ public final class Session {
         atxState = nil
         streamQualityFactor = nil
         videoCodecPreference = nil
+        failsafe = nil
         modifierTracker.reset()
         pointerThrottler.reset()
     }

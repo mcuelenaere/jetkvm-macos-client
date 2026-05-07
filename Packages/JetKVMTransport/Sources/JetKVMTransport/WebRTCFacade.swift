@@ -52,6 +52,8 @@ public actor WebRTCFacade {
     private var hidrpcReliable: RTCDataChannel?
     private var hidrpcUnreliableOrdered: RTCDataChannel?
     private var hidDataChannelDelegate: HIDDataChannelDelegate?
+    private var rpcChannel: RTCDataChannel?
+    private var rpcDelegate: RPCDataChannelDelegate?
 
     public let localIceCandidates: AsyncStream<IceCandidate>
     public let videoTracks: AsyncStream<RTCVideoTrack>
@@ -65,12 +67,20 @@ public actor WebRTCFacade {
     /// `true` means we've sent the handshake and the channel is ready to
     /// carry input.
     public let hidReadyState: AsyncStream<Bool>
+    /// Raw text frames received on the `rpc` data channel. The
+    /// JSONRPCClient parses these into requests / responses /
+    /// notifications.
+    public let incomingRPCFrames: AsyncStream<Data>
+    /// Reflects the open/closed state of the `rpc` channel.
+    public let rpcReadyState: AsyncStream<Bool>
 
     private let localIceCandidatesContinuation: AsyncStream<IceCandidate>.Continuation
     private let videoTracksContinuation: AsyncStream<RTCVideoTrack>.Continuation
     private let connectionStateContinuation: AsyncStream<WebRTCConnectionState>.Continuation
     private let incomingHIDContinuation: AsyncStream<HIDRPCMessage>.Continuation
     private let hidReadyStateContinuation: AsyncStream<Bool>.Continuation
+    private let incomingRPCFramesContinuation: AsyncStream<Data>.Continuation
+    private let rpcReadyStateContinuation: AsyncStream<Bool>.Continuation
 
     public init() {
         // RTCDefaultVideoEncoderFactory / RTCDefaultVideoDecoderFactory ship
@@ -102,6 +112,14 @@ public actor WebRTCFacade {
         var readyCont: AsyncStream<Bool>.Continuation!
         self.hidReadyState = AsyncStream<Bool> { readyCont = $0 }
         self.hidReadyStateContinuation = readyCont
+
+        var rpcFramesCont: AsyncStream<Data>.Continuation!
+        self.incomingRPCFrames = AsyncStream<Data> { rpcFramesCont = $0 }
+        self.incomingRPCFramesContinuation = rpcFramesCont
+
+        var rpcReadyCont: AsyncStream<Bool>.Continuation!
+        self.rpcReadyState = AsyncStream<Bool> { rpcReadyCont = $0 }
+        self.rpcReadyStateContinuation = rpcReadyCont
     }
 
     /// Create the peer connection, add a single recvonly video transceiver,
@@ -173,6 +191,24 @@ public actor WebRTCFacade {
         unreliable.delegate = hidDelegate
         self.hidrpcUnreliableOrdered = unreliable
 
+        // Open the `rpc` channel for JSON-RPC traffic. Ordered,
+        // reliable, text-mode. Server-pushed events fire on this
+        // channel as soon as it opens (`webrtc.go:406-411`) — the
+        // JSONRPCClient consumer handles those notifications without
+        // a separate subscribe.
+        let rpcConfig = RTCDataChannelConfiguration()
+        rpcConfig.isOrdered = true
+        let rpcDelegate = RPCDataChannelDelegate(
+            framesContinuation: incomingRPCFramesContinuation,
+            readyStateContinuation: rpcReadyStateContinuation
+        )
+        self.rpcDelegate = rpcDelegate
+        guard let rpc = pc.dataChannel(forLabel: "rpc", configuration: rpcConfig) else {
+            throw WebRTCFacadeError.dataChannelCreationFailed(label: "rpc")
+        }
+        rpc.delegate = rpcDelegate
+        self.rpcChannel = rpc
+
         // Create the offer.
         let offerConstraints = RTCMediaConstraints(
             mandatoryConstraints: ["OfferToReceiveVideo": "true"],
@@ -230,6 +266,16 @@ public actor WebRTCFacade {
         _ = target.sendData(buffer)
     }
 
+    /// Send a UTF-8 text frame on the `rpc` data channel. Returns
+    /// `false` if the channel isn't open or the send queued failed.
+    /// Used by `JSONRPCClient` as its outgoing transport.
+    public func sendRPCFrame(_ frame: String) -> Bool {
+        guard let channel = rpcChannel else { return false }
+        guard let bytes = frame.data(using: .utf8) else { return false }
+        let buffer = RTCDataBuffer(data: bytes, isBinary: false)
+        return channel.sendData(buffer)
+    }
+
     public func close() async {
         peerConnection?.close()
         peerConnection = nil
@@ -237,11 +283,15 @@ public actor WebRTCFacade {
         hidrpcReliable = nil
         hidrpcUnreliableOrdered = nil
         hidDataChannelDelegate = nil
+        rpcChannel = nil
+        rpcDelegate = nil
         localIceCandidatesContinuation.finish()
         videoTracksContinuation.finish()
         connectionStateContinuation.finish()
         incomingHIDContinuation.finish()
         hidReadyStateContinuation.finish()
+        incomingRPCFramesContinuation.finish()
+        rpcReadyStateContinuation.finish()
     }
 
     // MARK: - SDP wire format
@@ -475,5 +525,36 @@ private final class HIDDataChannelDelegate: NSObject, RTCDataChannelDelegate, @u
             // Drop unparseable frames — surfacing them as errors would
             // tear down the stream and there's nothing the caller can do.
         }
+    }
+}
+
+/// Delegate for the `rpc` text channel. Forwards raw frames to the
+/// owning facade's stream; the JSONRPCClient does the parsing.
+private final class RPCDataChannelDelegate: NSObject, RTCDataChannelDelegate, @unchecked Sendable {
+    let framesContinuation: AsyncStream<Data>.Continuation
+    let readyStateContinuation: AsyncStream<Bool>.Continuation
+
+    init(
+        framesContinuation: AsyncStream<Data>.Continuation,
+        readyStateContinuation: AsyncStream<Bool>.Continuation
+    ) {
+        self.framesContinuation = framesContinuation
+        self.readyStateContinuation = readyStateContinuation
+    }
+
+    func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) {
+        switch dataChannel.readyState {
+        case .open: readyStateContinuation.yield(true)
+        case .closing, .closed: readyStateContinuation.yield(false)
+        case .connecting: break
+        @unknown default: break
+        }
+    }
+
+    func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
+        // The rpc channel is text-mode; ignore any binary frames the
+        // server might accidentally send.
+        guard !buffer.isBinary else { return }
+        framesContinuation.yield(buffer.data)
     }
 }

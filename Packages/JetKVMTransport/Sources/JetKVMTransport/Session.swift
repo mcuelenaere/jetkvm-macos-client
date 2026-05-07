@@ -53,6 +53,13 @@ public final class Session {
     /// keypress/pointer reports aren't silently dropped server-side
     /// (`hidrpc.go:28`).
     public private(set) var hidReady: Bool = false
+    /// `true` once the `rpc` data channel is open. Typed RPC methods
+    /// should gate on this so calls don't hang waiting for a
+    /// response that can't ride a closed channel.
+    public private(set) var rpcReady: Bool = false
+    /// The JSON-RPC 2.0 client over the `rpc` data channel. Available
+    /// once the connection is up; nil before connect / after disconnect.
+    public private(set) var rpc: JSONRPCClient?
 
     private var endpoint: DeviceEndpoint?
     private var http: HTTPClient?
@@ -128,10 +135,16 @@ public final class Session {
             }
             self.deviceMetadata = metadata
 
-            // 4. Stand up the WebRTC peer connection and pumps.
+            // 4. Stand up the WebRTC peer connection, the JSON-RPC
+            //    client over its rpc channel, and the pumps.
             let webrtc = WebRTCFacade()
             self.webrtc = webrtc
-            startPumps(webrtc: webrtc, signaling: signaling, incoming: incoming)
+            let rpcClient = JSONRPCClient(send: { [weak webrtc] frame in
+                guard let webrtc else { return false }
+                return await webrtc.sendRPCFrame(frame)
+            })
+            self.rpc = rpcClient
+            startPumps(webrtc: webrtc, signaling: signaling, incoming: incoming, rpc: rpcClient)
 
             // 5. Build offer and ship it.
             state = .connecting(.offering)
@@ -259,7 +272,8 @@ public final class Session {
     private func startPumps(
         webrtc: WebRTCFacade,
         signaling: SignalingClient,
-        incoming: AsyncThrowingStream<SignalingMessage, Error>
+        incoming: AsyncThrowingStream<SignalingMessage, Error>,
+        rpc: JSONRPCClient
     ) {
         // 1. Server → us: answers and ICE candidates from signaling stream.
         pumpTasks.append(Task { [weak self] in
@@ -315,6 +329,20 @@ public final class Session {
                 }
             }
         })
+
+        // 6. Pump rpc text frames into the JSON-RPC client.
+        pumpTasks.append(Task {
+            for await frame in await webrtc.incomingRPCFrames {
+                await rpc.handle(incomingFrame: frame)
+            }
+        })
+
+        // 7. Track rpc channel open/closed state.
+        pumpTasks.append(Task { @MainActor [weak self] in
+            for await ready in await webrtc.rpcReadyState {
+                self?.rpcReady = ready
+            }
+        })
     }
 
     private func attachVideoTrack(_ track: RTCVideoTrack) {
@@ -354,17 +382,22 @@ public final class Session {
     private func teardown() async {
         for task in pumpTasks { task.cancel() }
         pumpTasks = []
+        if let rpc = self.rpc {
+            await rpc.close()
+        }
         if let webrtc = self.webrtc {
             await webrtc.close()
         }
         if let signaling = self.signaling {
             await signaling.disconnect()
         }
+        rpc = nil
         webrtc = nil
         signaling = nil
         http = nil
         videoTrack = nil
         hidReady = false
+        rpcReady = false
         modifierTracker.reset()
         pointerThrottler.reset()
     }

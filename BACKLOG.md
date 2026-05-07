@@ -5,6 +5,82 @@ to be picked up cold without re-litigating the original investigation.
 
 ---
 
+## Remove the explicit "Capture" toolbar toggle (auto-engage)
+
+**Where:** `App/KVMWindowView.swift` (toolbar item),
+`App/KeyboardCapturer.swift` (toggle/state machine),
+`App/KVMVideoView.swift` (mouse-in-view tracking).
+
+**What's there now:** the user has to click a "Capture" toolbar
+toggle the first time to grant Accessibility permission and engage
+the CGEventTap. After that, focus-loss / focus-gain auto-suspends
+and resumes the tap, so the toggle is a one-time-per-session
+gesture once permission is granted.
+
+**Why remove it:** the toggle is a UX wart. The user's mental model
+is "I'm in the JetKVM window, all my keystrokes go to the host;
+I'm somewhere else, they don't" — exactly what the auto-pause
+already does on app focus. The explicit toggle adds a step.
+
+**Proposed model:** capture engages automatically whenever
+(a) the JetKVM window is the key window, **and**
+(b) the mouse cursor is inside the `KVMVideoView`.
+Disengages when either is false. No toolbar item.
+
+The "mouse in view" condition is the safety hatch for cases where
+the user wants to use system shortcuts on the client without losing
+the connection — they nudge the cursor outside the view (or to the
+title bar) and Cmd+Tab works normally.
+
+**Implementation outline:**
+1. `KVMVideoView`: track mouse-in-view via `mouseEntered` /
+   `mouseExited`, with an `NSTrackingArea` covering bounds. Forward
+   transitions to a callback.
+2. `KeyboardCapturer`: replace `userIntent` with the AND of
+   "window is key" and "mouse in view"; both are external inputs
+   driven by the view layer.
+3. First-run Accessibility prompt: trigger the system prompt the
+   first time `KVMWindowView` appears with a connected session,
+   not on toolbar click. If denied, fall back to in-window-only
+   capture (no CGEventTap), with a banner explaining the limitation
+   and a "Grant…" button that re-prompts.
+4. Drop the toolbar toggle.
+
+---
+
+## True fullscreen mode that hides the menu bar
+
+**Where:** `App/JetKVMClientApp.swift` (Scene/WindowGroup config),
+maybe a new `App/Window/FullscreenController.swift`.
+
+**What's there now:** the WindowGroup uses default macOS fullscreen
+(green button → window goes fullscreen, menu bar auto-hides on
+no-cursor and shows on cursor-to-top-of-screen). For a KVM the
+auto-show is the wrong default — it eats the top row of the host's
+display every time the user nudges the mouse upward.
+
+**Goal:** when the window is fullscreen, the menu bar stays hidden
+*even on cursor-at-top*, so the host's full resolution is visible
+1:1 the entire time. The Dock should also stay hidden.
+
+**Approach:**
+1. Use `NSApplication.shared.presentationOptions` to set
+   `[.autoHideMenuBar, .autoHideDock]` (or `.hideMenuBar` /
+   `.hideDock` for permanent — pick the one that matches the
+   "even on hover" intent; I think the `hide*` variants are
+   permanent and `autoHide*` are the always-show-on-hover ones).
+2. Apply when the window enters fullscreen, revert on exit.
+   `NSWindow.willEnterFullScreenNotification` /
+   `willExitFullScreenNotification` are the hooks.
+3. Probably also worth pinning the cursor to the video rect while
+   fullscreen + capture is on, so the host cursor doesn't drift
+   into the now-invisible menu bar area at the top.
+
+**Don't break the non-fullscreen path** — only apply the
+presentation options while in fullscreen.
+
+---
+
 ## Scroll wheel support (requires upstream JetKVM change)
 
 **Where (client):** `App/KVMVideoView.swift` would override

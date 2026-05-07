@@ -8,7 +8,6 @@ struct ConnectView: View {
     @State private var port: String = "80"
     @State private var password: String = ""
     @State private var useTLS: Bool = false
-    @State private var trustSelfSignedCert: Bool = false
 
     private var isAwaitingPassword: Bool {
         if case .awaitingPassword = session.state { return true } else { return false }
@@ -43,11 +42,7 @@ struct ConnectView: View {
                         .disabled(inputsLocked)
                     Toggle("HTTPS", isOn: $useTLS)
                         .disabled(inputsLocked)
-                    if useTLS {
-                        Toggle("Trust self-signed", isOn: $trustSelfSignedCert)
-                            .disabled(inputsLocked)
-                            .help("JetKVM ships with a self-signed certificate by default; enable this to accept it.")
-                    }
+                        .help("Only works against a JetKVM behind a reverse proxy with a real CA-issued certificate. The default self-signed certificate is not currently supported on macOS — use HTTP for the LAN case.")
                 }
 
                 if isAwaitingPassword || !password.isEmpty {
@@ -95,8 +90,7 @@ struct ConnectView: View {
         let endpoint = DeviceEndpoint(
             host: host,
             port: portValue,
-            useTLS: useTLS,
-            allowSelfSignedCertificate: useTLS && trustSelfSignedCert
+            useTLS: useTLS
         )
         let pwd = password.isEmpty ? nil : password
         await session.connect(endpoint: endpoint, password: pwd)

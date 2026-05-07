@@ -5,17 +5,19 @@ import Security
 private let log = Logger(subsystem: "app.jetkvm.client", category: "tls")
 
 /// `URLSessionDelegate` that optionally trusts any server certificate
-/// presented during the TLS handshake. Used so a user-opted-in
-/// connection to a JetKVM device's default self-signed certificate
-/// doesn't immediately fail closed.
+/// presented during the TLS handshake. Reserved for future use — at the
+/// time of writing this delegate is *never invoked* for JetKVM's default
+/// self-signed cert chain on macOS 14+, because Apple's
+/// Network.framework BoringSSL fails to extract the peer certificates
+/// from the SSL session before the cert-verification callback can hand
+/// off to URLSession's delegate. See the comment on
+/// `DeviceEndpoint.allowSelfSignedCertificate` for the broader context.
 ///
-/// `URLCredential(trust:)` alone is not enough — URLSession also runs
-/// hostname validation, and JetKVM's default cert's CN typically does
-/// not match the address the user typed (e.g. `jetkvm.local`). We
-/// install `SecTrustSetExceptions` to bypass *all* validation failures
-/// when the user has explicitly opted in; this is equivalent to "I
-/// trust this exact certificate from this exact server" and is the
-/// pattern Apple documents for handling self-signed certs.
+/// We keep the delegate around because it correctly handles the
+/// uncommon case of a JetKVM behind a reverse proxy with a real
+/// (CA-issued) cert when `allowSelfSignedCertificate` is left false —
+/// it falls through to default handling and the connection succeeds
+/// against the system trust store.
 final class TLSDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionWebSocketDelegate, @unchecked Sendable {
     let allowSelfSignedCertificate: Bool
 

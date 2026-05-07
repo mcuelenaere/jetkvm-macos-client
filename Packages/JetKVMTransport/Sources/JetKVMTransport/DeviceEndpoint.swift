@@ -9,10 +9,18 @@ public struct DeviceEndpoint: Sendable, Hashable {
     public let host: String
     public let port: Int
     public let useTLS: Bool
-    /// Accept the server's TLS certificate without normal trust validation.
-    /// JetKVM ships with a self-signed certificate by default, so HTTPS/WSS
-    /// connections fail closed without this opt-in. Only set true when the
-    /// user has explicitly accepted it for this device.
+    /// Reserved for future use. Asks `TLSDelegate` to override the system
+    /// trust evaluation with `SecTrustSetExceptions` when set true.
+    ///
+    /// **Currently a no-op for the JetKVM default cert path on macOS 14+:**
+    /// Apple's Network.framework BoringSSL fails the TLS handshake at
+    /// `boringssl_session_set_peer_verification_state_from_session` before
+    /// our delegate is invoked at all, so we never get a chance to
+    /// override. Verified against M1 hardware — `[tls]` log category
+    /// stays silent. The transport API still carries the flag because
+    /// a) the current UI keeps it off, b) a future workaround
+    /// (e.g. shipping the JetKVM CA in a custom trust store) would re-use
+    /// this code path.
     public let allowSelfSignedCertificate: Bool
 
     public init(

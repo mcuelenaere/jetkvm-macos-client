@@ -4,6 +4,7 @@ import WebRTC
 
 struct KVMWindowView: View {
     @Environment(Session.self) private var session
+    @Environment(\.dismissWindow) private var dismissWindow
     @State private var capturer = KeyboardCapturer()
     @State private var pointerLock = PointerLockManager()
     @State private var hostKey = HostKeyDetector()
@@ -147,7 +148,11 @@ struct KVMWindowView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Disconnect") {
-                    Task { await session.disconnect() }
+                    // Close the window; KVMSessionWindow's onDisappear
+                    // tears the session down. Calling
+                    // session.disconnect() directly here would just
+                    // bounce us back to the connect overlay.
+                    dismissWindow()
                 }
             }
         }

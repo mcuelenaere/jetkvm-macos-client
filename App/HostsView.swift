@@ -95,7 +95,7 @@ struct HostsView: View {
         // openWindow with a value spawns a new window — or focuses an
         // existing one for the same id. Either way the user ends up at
         // a session for this host.
-        openWindow(value: host.id)
+        openWindow(value: KVMSessionWindowID(host.id))
     }
 }
 

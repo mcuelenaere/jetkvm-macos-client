@@ -1,6 +1,37 @@
 import SwiftUI
 import JetKVMTransport
 
+/// Identifier for a KVM session window. Wraps the host's UUID so the
+/// WindowGroup's `for:` slot is a distinct nominal type rather than a
+/// raw UUID — and so we can refuse Codable decoding to opt out of
+/// SwiftUI's session-window state restoration on relaunch.
+///
+/// `restorationBehavior(.disabled)` would express the same intent more
+/// directly, but it's macOS 15+. Throwing on decode achieves the same
+/// effect on macOS 14: SwiftUI tries to restore the previously-open
+/// session windows, fails to deserialize the value, and silently drops
+/// them. Encoding works (in case SwiftUI persists during runtime), so
+/// in-session window-state behaviors keep functioning.
+struct KVMSessionWindowID: Hashable, Codable {
+    let hostID: SavedHost.ID
+
+    init(_ hostID: SavedHost.ID) {
+        self.hostID = hostID
+    }
+
+    init(from decoder: Decoder) throws {
+        throw DecodingError.dataCorrupted(.init(
+            codingPath: decoder.codingPath,
+            debugDescription: "KVM session windows are intentionally not restored"
+        ))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(hostID)
+    }
+}
+
 @main
 struct JetKVMClientApp: App {
     @State private var hostStore = HostStore()
@@ -15,27 +46,18 @@ struct JetKVMClientApp: App {
         .defaultSize(width: 520, height: 420)
 
         // One window per connected host. Spawned by openWindow(value:)
-        // from HostsView with a SavedHost.id. Each window owns its own
-        // Session so multiple hosts can be connected at the same time.
-        WindowGroup("JetKVM Session", for: SavedHost.ID.self) { $hostID in
+        // from HostsView with a KVMSessionWindowID. Each window owns
+        // its own Session so multiple hosts can be connected at the
+        // same time.
+        WindowGroup("JetKVM Session", for: KVMSessionWindowID.self) { $sessionID in
             Group {
-                if let id = hostID, let host = hostStore.find(id: id) {
+                if let id = sessionID, let host = hostStore.find(id: id.hostID) {
                     KVMSessionWindow(host: host)
                 } else {
-                    // Window restored but the host no longer exists
-                    // (deleted between launches). Show a small
-                    // explainer instead of a blank window.
-                    VStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.title)
-                            .foregroundStyle(.secondary)
-                        Text("Saved host not found")
-                            .font(.headline)
-                        Text("Re-add it from the JetKVM window.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Restoration failure (intentional) or the host
+                    // has been deleted: render an empty placeholder
+                    // that the user just closes.
+                    Color.clear
                 }
             }
             .environment(hostStore)

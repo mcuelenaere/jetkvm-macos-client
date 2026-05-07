@@ -8,6 +8,7 @@ struct ConnectView: View {
     @State private var port: String = "80"
     @State private var password: String = ""
     @State private var useTLS: Bool = false
+    @State private var rememberPassword: Bool = true
 
     private var isAwaitingPassword: Bool {
         if case .awaitingPassword = session.state { return true } else { return false }
@@ -34,6 +35,14 @@ struct ConnectView: View {
                 TextField("Host", text: $host, prompt: Text("kvm.local or 192.168.1.42"))
                     .textFieldStyle(.roundedBorder)
                     .disabled(inputsLocked)
+                    .onChange(of: host) { _, new in
+                        autofillPasswordIfAvailable(for: new)
+                    }
+                    .onSubmit {
+                        // Also handles paste-then-Tab — try filling
+                        // immediately if the user committed the host.
+                        autofillPasswordIfAvailable(for: host)
+                    }
 
                 HStack {
                     TextField("Port", text: $port)
@@ -48,6 +57,8 @@ struct ConnectView: View {
                 if isAwaitingPassword || !password.isEmpty {
                     SecureField("Password", text: $password)
                         .textFieldStyle(.roundedBorder)
+                    Toggle("Remember password", isOn: $rememberPassword)
+                        .help("Save the password to the macOS Keychain so it auto-fills the next time you connect to this host.")
                 }
             }
 
@@ -93,6 +104,27 @@ struct ConnectView: View {
             useTLS: useTLS
         )
         let pwd = password.isEmpty ? nil : password
+        // Persist before kicking off connect so the next launch finds
+        // the password regardless of how this attempt resolves. If it
+        // ends up being wrong, the user types a new one next time and
+        // we overwrite. On explicit toggle-off, remove the entry.
+        if let pwd {
+            if rememberPassword {
+                PasswordVault.save(pwd, for: host)
+            } else {
+                PasswordVault.delete(for: host)
+            }
+        }
         await session.connect(endpoint: endpoint, password: pwd)
+    }
+
+    /// Auto-fill the password field when the user types a host we
+    /// already have a saved entry for. Only overwrite when the field
+    /// is empty so we don't trample what the user is typing.
+    private func autofillPasswordIfAvailable(for host: String) {
+        guard !host.isEmpty, password.isEmpty else { return }
+        if let saved = PasswordVault.load(for: host) {
+            password = saved
+        }
     }
 }

@@ -1,5 +1,8 @@
 import Foundation
 import JetKVMProtocol
+import OSLog
+
+private let log = Logger(subsystem: "app.jetkvm.client", category: "signaling")
 
 public enum SignalingError: Error, Sendable {
     /// The first message we received over the WebSocket wasn't `device-metadata`.
@@ -82,12 +85,15 @@ public actor SignalingClient {
         let task = session.webSocketTask(with: request)
         self.task = task
         task.resume()
+        log.info("WS opened to \(url.absoluteString, privacy: .public)")
 
         // First message must be device-metadata.
         let firstMessage = try await receiveSingleMessage(task: task)
         guard case .deviceMetadata(let metadata) = firstMessage else {
+            log.error("first WS message was not device-metadata: \(String(describing: firstMessage), privacy: .public)")
             throw SignalingError.unexpectedFirstMessage(firstMessage)
         }
+        log.info("device-metadata received, deviceVersion=\(metadata.deviceVersion, privacy: .public)")
 
         let stream = AsyncThrowingStream<SignalingMessage, Error> { continuation in
             self.streamContinuation = continuation
@@ -125,6 +131,7 @@ public actor SignalingClient {
     }
 
     public func disconnect() async {
+        log.info("WS disconnect")
         await cancelReceive()
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil
@@ -162,6 +169,7 @@ public actor SignalingClient {
             do {
                 frame = try await task.receive()
             } catch {
+                log.error("WS receive failed: \(String(describing: error), privacy: .public)")
                 streamContinuation?.finish(throwing: SignalingError.disconnected(String(describing: error)))
                 return
             }
@@ -170,6 +178,7 @@ public actor SignalingClient {
                     streamContinuation?.yield(msg)
                 }
             } catch {
+                log.error("WS frame parse failed: \(String(describing: error), privacy: .public)")
                 streamContinuation?.finish(throwing: error)
                 return
             }

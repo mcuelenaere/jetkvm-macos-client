@@ -1,5 +1,8 @@
 import Foundation
 import JetKVMProtocol
+import OSLog
+
+private let log = Logger(subsystem: "app.jetkvm.client", category: "rpc")
 
 public enum JSONRPCClientError: Error, Sendable {
     /// Underlying transport (rpc data channel) reported send failure.
@@ -95,6 +98,7 @@ public actor JSONRPCClient {
             Task { [send] in
                 let ok = await send(frame)
                 if !ok {
+                    log.error("rpc send failed for \(method, privacy: .public) id=\(id, privacy: .public)")
                     // Send failed; clean up so we don't leak the
                     // continuation (handle() won't ever resume it).
                     if let pending = await self.takePending(id) {
@@ -110,15 +114,18 @@ public actor JSONRPCClient {
         do {
             header = try decoder.decode(ResponseHeader.self, from: responseData)
         } catch {
+            log.error("rpc response header decode failed for \(method, privacy: .public) id=\(id, privacy: .public): \(String(describing: error), privacy: .public)")
             throw JSONRPCClientError.malformedResponse(String(describing: error))
         }
         if let serverError = header.error {
+            log.notice("rpc server error for \(method, privacy: .public) id=\(id, privacy: .public): \(serverError.code, privacy: .public) \(serverError.message, privacy: .public)")
             throw JSONRPCClientError.server(serverError)
         }
         do {
             let envelope = try decoder.decode(ResultEnvelope<R>.self, from: responseData)
             return envelope.result
         } catch {
+            log.error("rpc result decode failed for \(method, privacy: .public) id=\(id, privacy: .public) as \(String(describing: R.self), privacy: .public): \(String(describing: error), privacy: .public)")
             throw JSONRPCClientError.malformedResponse(String(describing: error))
         }
     }
@@ -143,6 +150,8 @@ public actor JSONRPCClient {
             // Malformed frame — drop. Surfacing as an error would
             // tear down the notifications stream and there's nothing
             // the consumer can do.
+            let preview = String(data: data.prefix(256), encoding: .utf8) ?? "<\(data.count) bytes non-UTF8>"
+            log.error("rpc dropped malformed incoming frame: \(preview, privacy: .public)")
             return
         }
         if let id = envelope.id {

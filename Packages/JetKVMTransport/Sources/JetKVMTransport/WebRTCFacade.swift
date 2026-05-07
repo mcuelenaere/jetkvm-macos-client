@@ -1,6 +1,9 @@
 import Foundation
 import JetKVMProtocol
+import OSLog
 import WebRTC
+
+private let log = Logger(subsystem: "app.jetkvm.client", category: "webrtc")
 
 public enum WebRTCFacadeError: Error, Sendable {
     case peerConnectionCreationFailed
@@ -480,6 +483,7 @@ private final class PeerDelegate: NSObject, RTCPeerConnectionDelegate, @unchecke
         case .closed: mapped = .closed
         @unknown default: mapped = .new
         }
+        log.info("ICE state → \(String(describing: mapped), privacy: .public)")
         stateContinuation.yield(mapped)
     }
 
@@ -538,6 +542,7 @@ private final class HIDDataChannelDelegate: NSObject, RTCDataChannelDelegate, @u
     }
 
     func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) {
+        log.info("HID channel \(dataChannel.label, privacy: .public) state=\(stateLabel(dataChannel.readyState), privacy: .public)")
         // Only the reliable channel triggers handshake + ready signal.
         // The unreliable channel is just a transport — when it opens it's
         // ready to ship pointer reports immediately, but the server still
@@ -563,14 +568,28 @@ private final class HIDDataChannelDelegate: NSObject, RTCDataChannelDelegate, @u
     }
 
     func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
-        guard buffer.isBinary else { return }
+        guard buffer.isBinary else {
+            log.error("HID channel \(dataChannel.label, privacy: .public) got non-binary frame; dropping")
+            return
+        }
         do {
             let message = try HIDRPCMessage(wireFormat: buffer.data)
             incomingContinuation.yield(message)
         } catch {
             // Drop unparseable frames — surfacing them as errors would
             // tear down the stream and there's nothing the caller can do.
+            log.error("HID frame parse failed (\(buffer.data.count, privacy: .public) bytes): \(String(describing: error), privacy: .public)")
         }
+    }
+}
+
+private func stateLabel(_ state: RTCDataChannelState) -> String {
+    switch state {
+    case .connecting: return "connecting"
+    case .open: return "open"
+    case .closing: return "closing"
+    case .closed: return "closed"
+    @unknown default: return "unknown(\(state.rawValue))"
     }
 }
 
@@ -589,6 +608,7 @@ private final class RPCDataChannelDelegate: NSObject, RTCDataChannelDelegate, @u
     }
 
     func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) {
+        log.info("rpc channel state=\(stateLabel(dataChannel.readyState), privacy: .public)")
         switch dataChannel.readyState {
         case .open: readyStateContinuation.yield(true)
         case .closing, .closed: readyStateContinuation.yield(false)
@@ -600,7 +620,10 @@ private final class RPCDataChannelDelegate: NSObject, RTCDataChannelDelegate, @u
     func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
         // The rpc channel is text-mode; ignore any binary frames the
         // server might accidentally send.
-        guard !buffer.isBinary else { return }
+        guard !buffer.isBinary else {
+            log.error("rpc channel got binary frame; dropping")
+            return
+        }
         framesContinuation.yield(buffer.data)
     }
 }

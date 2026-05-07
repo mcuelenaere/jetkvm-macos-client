@@ -1,5 +1,8 @@
 import Foundation
 import JetKVMProtocol
+import OSLog
+
+private let log = Logger(subsystem: "app.jetkvm.client", category: "session")
 
 /// Typed wrappers for the JSON-RPC methods the control plane needs.
 ///
@@ -61,15 +64,16 @@ extension Session {
 
     /// Fetch every cached control-plane field in parallel. Called
     /// automatically when the rpc channel becomes ready; can also be
-    /// invoked manually by a UI refresh button.
+    /// invoked manually by a UI refresh button. Per-method failures
+    /// are logged but don't fail the whole refresh.
     public func refreshControlState() async {
         guard rpcReady else { return }
 
-        async let video = try? getVideoState()
-        async let usb = try? getUSBState()
-        async let atx = try? getATXState()
-        async let factor = try? getStreamQualityFactor()
-        async let codec = try? getVideoCodecPreference()
+        async let video = fetch("getVideoState") { try await self.getVideoState() }
+        async let usb = fetch("getUSBState") { try await self.getUSBState() }
+        async let atx = fetch("getATXState") { try await self.getATXState() }
+        async let factor = fetch("getStreamQualityFactor") { try await self.getStreamQualityFactor() }
+        async let codec = fetch("getVideoCodecPreference") { try await self.getVideoCodecPreference() }
 
         videoState = await video
         usbState = await usb
@@ -85,7 +89,10 @@ extension Session {
         do {
             try await setStreamQualityFactor(factor)
         } catch {
-            streamQualityFactor = try? await getStreamQualityFactor()
+            log.error("setStreamQualityFactor(\(factor, privacy: .public)) failed: \(String(describing: error), privacy: .public)")
+            streamQualityFactor = await fetch("getStreamQualityFactor") {
+                try await self.getStreamQualityFactor()
+            }
         }
     }
 
@@ -94,7 +101,19 @@ extension Session {
         do {
             try await setVideoCodecPreference(codec)
         } catch {
-            videoCodecPreference = try? await getVideoCodecPreference()
+            log.error("setVideoCodecPreference(\(codec.rawValue, privacy: .public)) failed: \(String(describing: error), privacy: .public)")
+            videoCodecPreference = await fetch("getVideoCodecPreference") {
+                try await self.getVideoCodecPreference()
+            }
+        }
+    }
+
+    private func fetch<R>(_ method: String, _ call: () async throws -> R) async -> R? {
+        do {
+            return try await call()
+        } catch {
+            log.error("\(method, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+            return nil
         }
     }
 

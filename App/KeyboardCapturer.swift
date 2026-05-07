@@ -1,6 +1,9 @@
 import AppKit
 import ApplicationServices
 import CoreGraphics
+import OSLog
+
+private let log = Logger(subsystem: "app.jetkvm.client", category: "tap")
 
 /// Manages a session-level `CGEventTap` so the app can swallow
 /// system-grabbed key combos (Cmd+Tab, Cmd+Q, Cmd+Space, etc.) and
@@ -106,10 +109,12 @@ final class KeyboardCapturer {
     /// `state` becomes `.enabled`. Otherwise `state` reflects the
     /// blocking condition (`.awaitingAccessibility` or `.suspended`).
     func enable() {
+        log.info("user enabled capture")
         userIntent = true
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let options: [String: Bool] = [promptKey: true]
         guard AXIsProcessTrustedWithOptions(options as CFDictionary) else {
+            log.notice("Accessibility permission not granted yet")
             state = .awaitingAccessibility
             return
         }
@@ -154,6 +159,7 @@ final class KeyboardCapturer {
         teardownTap()
         state = .suspended
         if wasActiveCapture {
+            log.info("app resigned active → tap suspended; releasing held modifiers")
             // Tell the owner so it can release any modifiers the
             // tracker thinks are held — otherwise the host gets a
             // stuck Cmd / Shift / etc.
@@ -163,6 +169,7 @@ final class KeyboardCapturer {
 
     private func appBecameActive() {
         guard userIntent, state != .enabled else { return }
+        log.info("app became active → re-installing tap")
         // Re-check Accessibility — the user may have granted it
         // manually while we were away.
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
@@ -197,9 +204,11 @@ final class KeyboardCapturer {
             callback: callback,
             userInfo: userInfo
         ) else {
+            log.error("CGEvent.tapCreate returned nil — Accessibility permission may have been revoked")
             state = .failed("Failed to install event tap")
             return
         }
+        log.info("CGEventTap installed")
 
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
@@ -240,6 +249,7 @@ final class KeyboardCapturer {
                 // The system auto-disables a tap that's too slow or
                 // the user deliberately suspended. Re-enable so the
                 // user doesn't have to flip our toggle off-and-on.
+                log.notice("event tap auto-disabled (\(type.rawValue, privacy: .public)) — re-enabling")
                 if let tap = eventTap {
                     CGEvent.tapEnable(tap: tap, enable: true)
                 }

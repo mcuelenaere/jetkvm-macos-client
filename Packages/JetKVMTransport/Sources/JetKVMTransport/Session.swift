@@ -1,7 +1,10 @@
 import Foundation
 import JetKVMProtocol
 import Observation
+import OSLog
 import WebRTC
+
+private let log = Logger(subsystem: "app.jetkvm.client", category: "session")
 
 public enum SessionError: Error, Sendable {
     /// `GET /device/status` returned `isSetup: false`. The device hasn't
@@ -107,6 +110,7 @@ public final class Session {
     /// password and call `connect(...)` again with it.
     public func connect(endpoint: DeviceEndpoint, password: String? = nil) async {
         if case .connecting = state { return }
+        log.info("connect → \(endpoint.host, privacy: .public):\(endpoint.port, privacy: .public) tls=\(endpoint.useTLS, privacy: .public)")
         await teardown()
 
         self.endpoint = endpoint
@@ -119,6 +123,7 @@ public final class Session {
             // 1. Public status check.
             let status = try await http.getDeviceStatus()
             guard status.isSetup else {
+                log.notice("device /device/status reports isSetup=false")
                 state = .failed("Device not provisioned. Open the web UI to set it up first.")
                 return
             }
@@ -136,12 +141,13 @@ public final class Session {
                     do {
                         try await http.login(password: password)
                     } catch HTTPClientError.unauthorized(let msg) {
+                        log.notice("login rejected: \(msg ?? "<no message>", privacy: .public)")
                         state = .awaitingPassword(self.device)
-                        _ = msg // keep optional for future UI surfacing
                         return
                     }
                     device = try await http.getDevice()
                 } else {
+                    log.info("/device 401 with no password supplied → awaiting password from UI")
                     state = .awaitingPassword(nil)
                     return
                 }
@@ -180,12 +186,14 @@ public final class Session {
             try await signaling.send(.offer(sdpBase64: offerSDP))
             state = .connecting(.awaitingAnswer)
         } catch {
+            log.error("connect failed: \(describe(error), privacy: .public)")
             state = .failed(describe(error))
             await teardown()
         }
     }
 
     public func disconnect() async {
+        log.info("disconnect")
         await teardown()
         state = .idle
     }
@@ -320,6 +328,7 @@ public final class Session {
                     }
                 }
             } catch {
+                log.error("signaling pump terminated: \(describe(error), privacy: .public)")
                 await self?.fail(describe(error))
             }
         })

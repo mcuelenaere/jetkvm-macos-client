@@ -36,6 +36,10 @@ public final class Session {
         case connecting(Phase)
         case awaitingPassword(LocalDevice?)
         case connected
+        /// Connection dropped after we'd been .connected; backing off
+        /// before the next retry. `attempt` counts up across the
+        /// reconnect cycle (1 = first retry).
+        case reconnecting(attempt: Int)
         case kicked
         case failed(String)
 
@@ -104,6 +108,19 @@ public final class Session {
     /// the keep-alive loop whether to fire a heartbeat.
     private var heldNonModifierKeys: Set<UInt8> = []
 
+    // Reconnect state. Transitions:
+    //   user-initiated connect()        → reset all four
+    //   reach .connected (any attempt)  → reset reconnectAttempt to 0,
+    //                                     mark hasBeenConnectedThisSession
+    //   ICE drops .failed / .closed     → if hasBeenConnectedThisSession,
+    //                                     bump attempt + scheduleReconnect()
+    //   user-initiated disconnect()     → cancel reconnectTask, clear all
+    private var lastEndpoint: DeviceEndpoint?
+    private var lastPassword: String?
+    private var reconnectAttempt: Int = 0
+    private var reconnectTask: Task<Void, Never>?
+    private var hasBeenConnectedThisSession: Bool = false
+
     public init() {}
 
     // MARK: - Public API
@@ -115,6 +132,15 @@ public final class Session {
     public func connect(endpoint: DeviceEndpoint, password: String? = nil) async {
         if case .connecting = state { return }
         log.info("connect → \(endpoint.host, privacy: .public):\(endpoint.port, privacy: .public) tls=\(endpoint.useTLS, privacy: .public)")
+        // User-initiated connect — reset the reconnect state machine
+        // so we don't carry over a previous failure's attempt count
+        // or pending retry timer.
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempt = 0
+        hasBeenConnectedThisSession = false
+        lastEndpoint = endpoint
+        lastPassword = password
         await teardown()
 
         self.endpoint = endpoint
@@ -191,13 +217,32 @@ public final class Session {
             state = .connecting(.awaitingAnswer)
         } catch {
             log.error("connect failed: \(describe(error), privacy: .public)")
-            state = .failed(describe(error))
-            await teardown()
+            // If this attempt was part of a reconnect cycle, bump the
+            // attempt counter and schedule another retry instead of
+            // declaring terminal failure. Fresh user-initiated
+            // connects (reconnectAttempt == 0) go to .failed so the UI
+            // prompts the user to retry manually.
+            if reconnectAttempt > 0 {
+                await teardown()
+                scheduleReconnect()
+            } else {
+                state = .failed(describe(error))
+                await teardown()
+            }
         }
     }
 
     public func disconnect() async {
         log.info("disconnect")
+        // Cancel any pending reconnect attempt and clear the saved
+        // endpoint/password so a stale timer can't fire after the
+        // user has explicitly bailed.
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempt = 0
+        hasBeenConnectedThisSession = false
+        lastEndpoint = nil
+        lastPassword = nil
         await teardown()
         state = .idle
     }
@@ -523,22 +568,131 @@ public final class Session {
             // even if the underlying RTC state is technically still
             // connected for the second or so before the server tears
             // us down.
-            if state != .kicked { state = .connected }
+            if state != .kicked {
+                state = .connected
+                hasBeenConnectedThisSession = true
+                reconnectAttempt = 0
+            }
         case .failed:
-            state = .failed("WebRTC connection failed")
+            // ICE giving up after retry. If we were ever connected
+            // this session, treat it as transient and reconnect with
+            // backoff. If we never made it (initial-connect ICE
+            // failure), surface as terminal so the user can intervene.
+            if hasBeenConnectedThisSession {
+                scheduleReconnect()
+            } else if reconnectAttempt > 0 {
+                // Reconnect-time ICE failure on a session that never
+                // re-established → keep retrying.
+                scheduleReconnect()
+            } else {
+                state = .failed("WebRTC connection failed")
+            }
         case .closed:
-            // Closure may be initiated by us or by the server (e.g. after
-            // otherSessionConnected). When we're already .kicked, stay
-            // there so the user sees the kicked UI; the connection is
-            // gone but the state explains why.
+            // Closure may be initiated by us or by the server (e.g.
+            // after otherSessionConnected). When we're already
+            // .kicked, stay there so the user sees the kicked UI.
+            // When we were .connected, this is an unexpected mid-
+            // session drop — auto-reconnect.
             if case .connected = state {
-                state = .idle
+                scheduleReconnect()
             }
         case .disconnected:
             // Transient — WebRTC may recover. Don't change state.
             break
         case .new, .connecting:
             break
+        }
+    }
+
+    /// Schedule the next reconnect attempt with exponential backoff
+    /// (1, 2, 4, 8, 16, capped at 30 seconds). The `reconnectAttempt`
+    /// counter persists across the cycle and only resets on
+    /// .connected or user-initiated connect/disconnect.
+    private func scheduleReconnect() {
+        guard let endpoint = lastEndpoint else { return }
+        reconnectAttempt += 1
+        let backoffSeconds = min(30, 1 << min(reconnectAttempt - 1, 4))  // 1, 2, 4, 8, 16, 30, 30, …
+        log.info("scheduling reconnect attempt \(self.reconnectAttempt, privacy: .public) in \(backoffSeconds, privacy: .public)s")
+        state = .reconnecting(attempt: reconnectAttempt)
+
+        reconnectTask?.cancel()
+        let savedPassword = lastPassword
+        reconnectTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(backoffSeconds))
+            guard let self, !Task.isCancelled else { return }
+            // Run the connect flow again with the same endpoint /
+            // password. The retry path falls through the same connect
+            // logic; on failure it loops back here via the catch
+            // branch in connect().
+            log.info("reconnect attempt \(self.reconnectAttempt, privacy: .public) firing")
+            await self.performReconnect(endpoint: endpoint, password: savedPassword)
+        }
+    }
+
+    private func performReconnect(endpoint: DeviceEndpoint, password: String?) async {
+        // Manually run the body of connect() WITHOUT the user-
+        // initiated reset, so reconnectAttempt and lastEndpoint stay
+        // intact across iterations of the cycle.
+        await teardown()
+        self.endpoint = endpoint
+        state = .connecting(.checkingStatus)
+        let http = HTTPClient(endpoint: endpoint)
+        self.http = http
+        do {
+            let status = try await http.getDeviceStatus()
+            guard status.isSetup else {
+                state = .failed("Device not provisioned. Open the web UI to set it up first.")
+                return
+            }
+            state = .connecting(.authenticating)
+            let device: LocalDevice
+            do {
+                device = try await http.getDevice()
+            } catch HTTPClientError.unauthorized {
+                if let password {
+                    do {
+                        try await http.login(password: password)
+                    } catch HTTPClientError.unauthorized {
+                        // Saved password no longer works — fall back
+                        // to terminal awaitingPassword so the user can
+                        // retype.
+                        state = .awaitingPassword(self.device)
+                        return
+                    }
+                    device = try await http.getDevice()
+                } else {
+                    state = .awaitingPassword(nil)
+                    return
+                }
+            }
+            self.device = device
+            state = .connecting(.signaling)
+            let signaling = SignalingClient(
+                endpoint: endpoint,
+                cookieHeader: http.currentCookieHeader
+            )
+            self.signaling = signaling
+            let (metadata, incoming) = try await signaling.connect()
+            guard !metadata.deviceVersion.isEmpty else {
+                throw SessionError.deviceTooOld
+            }
+            self.deviceMetadata = metadata
+            let webrtc = WebRTCFacade()
+            self.webrtc = webrtc
+            let rpcClient = JSONRPCClient(send: { [weak webrtc] frame in
+                guard let webrtc else { return false }
+                return await webrtc.sendRPCFrame(frame)
+            })
+            self.rpc = rpcClient
+            startPumps(webrtc: webrtc, signaling: signaling, incoming: incoming, rpc: rpcClient)
+            state = .connecting(.offering)
+            let offerSDP = try await webrtc.start()
+            try await signaling.send(.offer(sdpBase64: offerSDP))
+            state = .connecting(.awaitingAnswer)
+        } catch {
+            log.error("reconnect attempt \(self.reconnectAttempt, privacy: .public) failed: \(describe(error), privacy: .public)")
+            await teardown()
+            scheduleReconnect()
         }
     }
 

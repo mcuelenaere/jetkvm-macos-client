@@ -62,6 +62,13 @@ struct KVMWindowView: View {
                             foreground: .white
                         )
                     }
+                    if case .reconnecting(let attempt) = session.state {
+                        banner(
+                            "Connection lost — reconnecting (attempt \(attempt))…",
+                            background: .orange,
+                            foreground: .black
+                        )
+                    }
                     if let failsafe = session.failsafe, failsafe.active {
                         banner(
                             "Device is in failsafe mode: \(failsafe.reason)",

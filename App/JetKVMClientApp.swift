@@ -20,7 +20,11 @@ struct RootView: View {
 
     var body: some View {
         switch session.state {
-        case .connected, .kicked:
+        case .connected, .kicked, .reconnecting:
+            // .reconnecting lives in the KVM window so the user keeps
+            // their context (and last-frame video, since teardown nils
+            // the track) — falling back to ConnectView mid-session would
+            // be a jarring UX whiplash for what's usually a 1-2s blip.
             KVMWindowView()
         default:
             // Keep ConnectView alive across .idle / .connecting / .awaitingPassword /

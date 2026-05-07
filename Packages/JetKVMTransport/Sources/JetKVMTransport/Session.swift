@@ -48,12 +48,18 @@ public final class Session {
     public private(set) var deviceMetadata: DeviceMetadata?
     public private(set) var device: LocalDevice?
     public private(set) var videoTrack: RTCVideoTrack?
+    /// `true` once the reliable HID-RPC channel is open and the
+    /// handshake has been sent. Input handlers should gate on this so
+    /// keypress/pointer reports aren't silently dropped server-side
+    /// (`hidrpc.go:28`).
+    public private(set) var hidReady: Bool = false
 
     private var endpoint: DeviceEndpoint?
     private var http: HTTPClient?
     private var signaling: SignalingClient?
     private var webrtc: WebRTCFacade?
     private var pumpTasks: [Task<Void, Never>] = []
+    private var modifierTracker = ModifierTracker()
 
     public init() {}
 
@@ -142,6 +148,31 @@ public final class Session {
         state = .idle
     }
 
+    // MARK: - Input
+
+    /// Forward a `keyDown` or `keyUp` event from the KVM view. The
+    /// `keyCode` is the macOS Carbon virtual keycode
+    /// (`NSEvent.keyCode`); we translate via `KeyMap`.
+    /// Drops if the HID channel isn't ready yet, or if the keyCode
+    /// isn't in the keymap.
+    public func sendKeypress(virtualKeyCode keyCode: UInt16, pressed: Bool) {
+        guard hidReady, let webrtc else { return }
+        guard let usbHID = KeyMap.virtualKeyToHIDUsageID[keyCode] else { return }
+        let message = HIDRPCMessage.keypressReport(key: usbHID, pressed: pressed)
+        Task { await webrtc.sendHID(message, on: .reliable) }
+    }
+
+    /// Forward a `flagsChanged` event from the KVM view. Resolves the
+    /// transition through `ModifierTracker` and emits a single
+    /// `KeypressReport` for the modifier-key USB-HID code (0xE0..0xE7).
+    public func handleFlagsChanged(virtualKeyCode keyCode: UInt16) {
+        guard hidReady, let webrtc else { return }
+        guard let transition = modifierTracker.handle(modifierKeyCode: keyCode) else { return }
+        guard let usbHID = transition.modifier.usbHIDUsageID else { return }
+        let message = HIDRPCMessage.keypressReport(key: usbHID, pressed: transition.pressed)
+        Task { await webrtc.sendHID(message, on: .reliable) }
+    }
+
     // MARK: - Internal pumps
 
     private func startPumps(
@@ -193,6 +224,16 @@ public final class Session {
                 await self.handleRTCState(rtcState)
             }
         })
+
+        // 5. Track when the reliable HID channel is open + handshaken.
+        pumpTasks.append(Task { @MainActor [weak self] in
+            for await ready in await webrtc.hidReadyState {
+                self?.hidReady = ready
+                if !ready {
+                    self?.modifierTracker.reset()
+                }
+            }
+        })
     }
 
     private func attachVideoTrack(_ track: RTCVideoTrack) {
@@ -242,6 +283,8 @@ public final class Session {
         signaling = nil
         http = nil
         videoTrack = nil
+        hidReady = false
+        modifierTracker.reset()
     }
 }
 

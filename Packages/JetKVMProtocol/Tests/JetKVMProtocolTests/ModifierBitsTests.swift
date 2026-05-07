@@ -72,4 +72,24 @@ final class ModifierBitsTests: XCTestCase {
         let lr: MouseButtons = [.left, .right]
         XCTAssertEqual(lr.rawValue, 0x03)
     }
+
+    // MARK: - usbHIDUsageID extension
+
+    func testUSBHIDUsageIDForSingleModifiers() {
+        // Standard USB HID modifier-key codes 0xE0..0xE7.
+        XCTAssertEqual(ModifierBits.leftControl.usbHIDUsageID,  0xE0)
+        XCTAssertEqual(ModifierBits.leftShift.usbHIDUsageID,    0xE1)
+        XCTAssertEqual(ModifierBits.leftAlt.usbHIDUsageID,      0xE2)
+        XCTAssertEqual(ModifierBits.leftMeta.usbHIDUsageID,     0xE3)
+        XCTAssertEqual(ModifierBits.rightControl.usbHIDUsageID, 0xE4)
+        XCTAssertEqual(ModifierBits.rightShift.usbHIDUsageID,   0xE5)
+        XCTAssertEqual(ModifierBits.rightAlt.usbHIDUsageID,     0xE6)
+        XCTAssertEqual(ModifierBits.rightMeta.usbHIDUsageID,    0xE7)
+    }
+
+    func testUSBHIDUsageIDForEmptyAndMultiBitIsNil() {
+        XCTAssertNil(ModifierBits().usbHIDUsageID)
+        XCTAssertNil(ModifierBits.anyShift.usbHIDUsageID)
+        XCTAssertNil(([.leftMeta, .leftShift] as ModifierBits).usbHIDUsageID)
+    }
 }

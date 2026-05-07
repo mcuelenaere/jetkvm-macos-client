@@ -42,6 +42,25 @@ public struct ModifierBits: OptionSet, Sendable, Hashable {
     public static let anyShift:   ModifierBits = [.leftShift,   .rightShift]
     public static let anyAlt:     ModifierBits = [.leftAlt,     .rightAlt]
     public static let anyMeta:    ModifierBits = [.leftMeta,    .rightMeta]
+
+    /// USB-HID Usage ID for the modifier *as a key* (as opposed to the
+    /// JetKVM-specific modifier byte bit). Used when sending a single
+    /// modifier press/release through `KeypressReport` (0x05). Values
+    /// are the standard USB HID modifier-key codes 0xE0..0xE7.
+    /// Returns `nil` for the empty set or any multi-bit value.
+    public var usbHIDUsageID: UInt8? {
+        switch self {
+        case .leftControl:  return 0xE0
+        case .leftShift:    return 0xE1
+        case .leftAlt:      return 0xE2
+        case .leftMeta:     return 0xE3
+        case .rightControl: return 0xE4
+        case .rightShift:   return 0xE5
+        case .rightAlt:     return 0xE6
+        case .rightMeta:    return 0xE7
+        default: return nil
+        }
+    }
 }
 
 /// USB HID boot-mouse button bitmask, used in

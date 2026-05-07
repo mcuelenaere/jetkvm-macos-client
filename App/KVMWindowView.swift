@@ -9,7 +9,7 @@ struct KVMWindowView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let track = session.videoTrack {
-                KVMVideoRepresentable(track: track)
+                KVMVideoRepresentable(track: track, session: session)
             } else {
                 ProgressView("Waiting for video…")
                     .controlSize(.large)
@@ -35,14 +35,17 @@ struct KVMWindowView: View {
 
 private struct KVMVideoRepresentable: NSViewRepresentable {
     let track: RTCVideoTrack
+    let session: Session
 
     func makeNSView(context: Context) -> KVMVideoView {
         let view = KVMVideoView()
+        view.setSession(session)
         view.attach(track: track)
         return view
     }
 
     func updateNSView(_ nsView: KVMVideoView, context: Context) {
+        nsView.setSession(session)
         nsView.attach(track: track)
     }
 

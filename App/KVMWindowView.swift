@@ -5,18 +5,37 @@ import WebRTC
 struct KVMWindowView: View {
     @Environment(Session.self) private var session
     @State private var capturer = KeyboardCapturer()
+    @State private var pointerLock = PointerLockManager()
     @State private var showControls = false
     @State private var showStats = false
 
-    private var captureToggleBinding: Binding<Bool> {
+    private var keyboardCaptureBinding: Binding<Bool> {
         Binding(
-            get: {
-                if case .enabled = capturer.state { return true } else { return false }
-            },
+            get: { capturer.userIntent },
             set: { newValue in
                 if newValue { capturer.enable() } else { capturer.disable() }
             }
         )
+    }
+
+    private var pointerLockBinding: Binding<Bool> {
+        Binding(
+            get: { pointerLock.userIntent },
+            set: { newValue in
+                if newValue { pointerLock.enable() } else { pointerLock.disable() }
+            }
+        )
+    }
+
+    /// Reflects the union of intents — used to label and icon the
+    /// toolbar Capture menu.
+    private var captureSummary: (icon: String, label: String) {
+        switch (capturer.userIntent, pointerLock.userIntent) {
+        case (false, false): return ("keyboard", "Capture")
+        case (true, false):  return ("keyboard.fill", "Capture: kbd")
+        case (false, true):  return ("cursorarrow.rays", "Capture: ptr")
+        case (true, true):   return ("dot.viewfinder", "Capture: kbd+ptr")
+        }
     }
 
     var body: some View {
@@ -24,7 +43,11 @@ struct KVMWindowView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 if let track = session.videoTrack {
-                    KVMVideoRepresentable(track: track, session: session)
+                    KVMVideoRepresentable(
+                        track: track,
+                        session: session,
+                        pointerLocked: pointerLock.state == .enabled
+                    )
                 } else {
                     ProgressView("Waiting for video…")
                         .controlSize(.large)
@@ -68,11 +91,17 @@ struct KVMWindowView: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
-                Toggle(isOn: captureToggleBinding) {
-                    Label("Capture", systemImage: "keyboard")
+                Menu {
+                    Toggle(isOn: keyboardCaptureBinding) {
+                        Label("Keyboard shortcuts", systemImage: "keyboard")
+                    }
+                    Toggle(isOn: pointerLockBinding) {
+                        Label("Pointer lock", systemImage: "cursorarrow.rays")
+                    }
+                } label: {
+                    Label(captureSummary.label, systemImage: captureSummary.icon)
                 }
-                .toggleStyle(.button)
-                .help("Forward Cmd+Tab, Cmd+Space, and other system-grabbed shortcuts to the host. Requires Accessibility permission.")
+                .help("Capture system keyboard shortcuts (Cmd+Tab, Cmd+Space, …) and/or lock the pointer for relative mouse mode. Keyboard requires Accessibility permission.")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -129,6 +158,7 @@ struct KVMWindowView: View {
         }
         .onDisappear {
             capturer.disable()
+            pointerLock.disable()
         }
     }
 
@@ -148,16 +178,19 @@ struct KVMWindowView: View {
 private struct KVMVideoRepresentable: NSViewRepresentable {
     let track: RTCVideoTrack
     let session: Session
+    let pointerLocked: Bool
 
     func makeNSView(context: Context) -> KVMVideoView {
         let view = KVMVideoView()
         view.setSession(session)
+        view.pointerLocked = pointerLocked
         view.attach(track: track)
         return view
     }
 
     func updateNSView(_ nsView: KVMVideoView, context: Context) {
         nsView.setSession(session)
+        nsView.pointerLocked = pointerLocked
         nsView.attach(track: track)
     }
 

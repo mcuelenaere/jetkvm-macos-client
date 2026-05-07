@@ -17,6 +17,7 @@
 		D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C700000000000000000000C7 /* KeyboardCapturer.swift */; };
 		D900000000000000000000D9 /* ControlPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C800000000000000000000C8 /* ControlPanel.swift */; };
 		DA00000000000000000000DA /* StatsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C900000000000000000000C9 /* StatsPanel.swift */; };
+		DB00000000000000000000DB /* PointerLockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA00000000000000000000CA /* PointerLockManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +30,7 @@
 		C700000000000000000000C7 /* KeyboardCapturer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCapturer.swift; sourceTree = "<group>"; };
 		C800000000000000000000C8 /* ControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlPanel.swift; sourceTree = "<group>"; };
 		C900000000000000000000C9 /* StatsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsPanel.swift; sourceTree = "<group>"; };
+		CA00000000000000000000CA /* PointerLockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerLockManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +64,7 @@
 				C500000000000000000000C5 /* KVMWindowView.swift */,
 				C600000000000000000000C6 /* KVMVideoView.swift */,
 				C700000000000000000000C7 /* KeyboardCapturer.swift */,
+				CA00000000000000000000CA /* PointerLockManager.swift */,
 				C800000000000000000000C8 /* ControlPanel.swift */,
 				C900000000000000000000C9 /* StatsPanel.swift */,
 				C200000000000000000000C2 /* Info.plist */,
@@ -170,6 +173,7 @@
 				D600000000000000000000D6 /* KVMWindowView.swift in Sources */,
 				D700000000000000000000D7 /* KVMVideoView.swift in Sources */,
 				D800000000000000000000D8 /* KeyboardCapturer.swift in Sources */,
+				DB00000000000000000000DB /* PointerLockManager.swift in Sources */,
 				D900000000000000000000D9 /* ControlPanel.swift in Sources */,
 				DA00000000000000000000DA /* StatsPanel.swift in Sources */,
 			);

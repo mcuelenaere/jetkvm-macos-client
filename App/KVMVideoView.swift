@@ -21,6 +21,12 @@ final class KVMVideoView: NSView {
     private weak var currentTrack: RTCVideoTrack?
     private weak var session: Session?
     private var videoSize: CGSize = .zero
+    /// Set by the SwiftUI representable when pointer-lock is engaged.
+    /// When true, mouse events route through `Session.sendMouseRelative`
+    /// (relative deltas, MouseReport opcode 0x06) instead of
+    /// `sendPointerMotion` / `sendPointerButtonChange` (absolute,
+    /// PointerReport opcode 0x03).
+    var pointerLocked: Bool = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -171,6 +177,23 @@ final class KVMVideoView: NSView {
 
     private func sendPointer(event: NSEvent, motion: Bool) {
         guard let session else { return }
+        let buttons = MouseButtons(rawValue: UInt8(truncatingIfNeeded: NSEvent.pressedMouseButtons))
+
+        if pointerLocked {
+            // Pointer-lock engaged: send relative deltas via MouseReport
+            // (opcode 0x06). Button events (motion=false) become
+            // dx=dy=0 + new buttons bitmask so the host registers the
+            // press/release at the cursor's pinned position. NSEvent
+            // deltaX/Y are floating-point points; clamp to Int8 (-128..127)
+            // — typical mouse motion is single digits.
+            let dx = Int8(clamping: Int(event.deltaX.rounded()))
+            let dy = Int8(clamping: Int(event.deltaY.rounded()))
+            session.sendMouseRelative(dx: dx, dy: dy, buttons: buttons)
+            return
+        }
+
+        // Absolute pointer mode (default).
+        //
         // Motion events outside the video rect (letterbox bars,
         // toolbar, anywhere not over the actual host display) drop
         // — otherwise the host cursor walks toward the edge of its
@@ -179,10 +202,6 @@ final class KVMVideoView: NSView {
         // and releases outside still produces a clean release on
         // the host.
         guard let coords = normalizedCoords(event: event, clampOutOfBounds: !motion) else { return }
-        // NSEvent.pressedMouseButtons is a class property giving the
-        // global currently-pressed-buttons bitmask. Lower 5 bits map
-        // 1:1 to JetKVM's MouseButtons (left/right/middle/back/forward).
-        let buttons = MouseButtons(rawValue: UInt8(truncatingIfNeeded: NSEvent.pressedMouseButtons))
         if motion {
             session.sendPointerMotion(normalizedX: coords.x, normalizedY: coords.y, buttons: buttons)
         } else {

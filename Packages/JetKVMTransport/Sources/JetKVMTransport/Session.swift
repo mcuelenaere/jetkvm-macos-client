@@ -303,6 +303,17 @@ public final class Session {
         Task { await webrtc.sendHID(message, on: .unreliableOrdered) }
     }
 
+    /// Forward a relative-mouse event when pointer-lock is engaged.
+    /// `dx` / `dy` are signed bytes — clamp at the call site if the
+    /// underlying NSEvent delta exceeds Int8 range. `buttons` is the
+    /// current pressed-buttons bitmask (0 for pure motion, the
+    /// active button bit for drag, 0 again for release).
+    public func sendMouseRelative(dx: Int8, dy: Int8, buttons: MouseButtons) {
+        guard hidReady, let webrtc else { return }
+        let message = HIDRPCMessage.mouseReport(dx: dx, dy: dy, buttons: buttons.rawValue)
+        Task { await webrtc.sendHID(message, on: .unreliableOrdered) }
+    }
+
     // MARK: - Internal pumps
 
     private func startPumps(

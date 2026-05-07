@@ -81,6 +81,14 @@ public final class Session {
     /// device is in failsafe mode and the UI should warn the user.
     public internal(set) var failsafe: FailsafeModeNotification?
 
+    /// Most recent connection-quality sample. Updated ~1 Hz once the
+    /// peer connection is up.
+    public private(set) var latestStats: ConnectionStats?
+    /// Rolling window of recent samples, oldest first. Drives
+    /// sparkline rendering. Capped at `maxStatsHistory` samples.
+    public private(set) var statsHistory: [ConnectionStats] = []
+    public static let maxStatsHistory = 60
+
     private var endpoint: DeviceEndpoint?
     private var http: HTTPClient?
     private var signaling: SignalingClient?
@@ -378,6 +386,23 @@ public final class Session {
                 self?.handleRPCNotification(notification)
             }
         })
+
+        // 9. Connection-quality sampler. Drives the live FPS/RTT in
+        //    the status strip and the Stats panel sparklines.
+        pumpTasks.append(Task { @MainActor [weak self] in
+            for await sample in await webrtc.stats {
+                self?.appendStatsSample(sample)
+            }
+        })
+    }
+
+    private func appendStatsSample(_ sample: ConnectionStats) {
+        latestStats = sample
+        statsHistory.append(sample)
+        let overshoot = statsHistory.count - Self.maxStatsHistory
+        if overshoot > 0 {
+            statsHistory.removeFirst(overshoot)
+        }
     }
 
     private func handleRPCNotification(_ n: JSONRPCNotification) {
@@ -487,6 +512,8 @@ public final class Session {
         streamQualityFactor = nil
         videoCodecPreference = nil
         failsafe = nil
+        latestStats = nil
+        statsHistory = []
         modifierTracker.reset()
         pointerThrottler.reset()
     }

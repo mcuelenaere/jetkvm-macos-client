@@ -73,6 +73,9 @@ public actor WebRTCFacade {
     public let incomingRPCFrames: AsyncStream<Data>
     /// Reflects the open/closed state of the `rpc` channel.
     public let rpcReadyState: AsyncStream<Bool>
+    /// Connection-quality samples produced by the stats poller every
+    /// ~1 second once the peer connection is up.
+    public let stats: AsyncStream<ConnectionStats>
 
     private let localIceCandidatesContinuation: AsyncStream<IceCandidate>.Continuation
     private let videoTracksContinuation: AsyncStream<RTCVideoTrack>.Continuation
@@ -81,6 +84,8 @@ public actor WebRTCFacade {
     private let hidReadyStateContinuation: AsyncStream<Bool>.Continuation
     private let incomingRPCFramesContinuation: AsyncStream<Data>.Continuation
     private let rpcReadyStateContinuation: AsyncStream<Bool>.Continuation
+    private let statsContinuation: AsyncStream<ConnectionStats>.Continuation
+    private var statsTask: Task<Void, Never>?
 
     public init() {
         // RTCDefaultVideoEncoderFactory / RTCDefaultVideoDecoderFactory ship
@@ -120,6 +125,10 @@ public actor WebRTCFacade {
         var rpcReadyCont: AsyncStream<Bool>.Continuation!
         self.rpcReadyState = AsyncStream<Bool> { rpcReadyCont = $0 }
         self.rpcReadyStateContinuation = rpcReadyCont
+
+        var statsCont: AsyncStream<ConnectionStats>.Continuation!
+        self.stats = AsyncStream<ConnectionStats> { statsCont = $0 }
+        self.statsContinuation = statsCont
     }
 
     /// Create the peer connection, add a single recvonly video transceiver,
@@ -209,6 +218,18 @@ public actor WebRTCFacade {
         rpc.delegate = rpcDelegate
         self.rpcChannel = rpc
 
+        // Kick off the connection-quality stats poller. Runs at ~1 Hz
+        // for the lifetime of the peer connection. First sample lands
+        // ~1s after start; deltas (bitrate, decode time, playback
+        // delay) are nil on that first sample because the parser has
+        // no previous-value reference yet.
+        statsTask = Task { [weak self] in
+            await Self.runStatsPoller(
+                peerConnection: pc,
+                continuation: self?.statsContinuation
+            )
+        }
+
         // Create the offer.
         let offerConstraints = RTCMediaConstraints(
             mandatoryConstraints: ["OfferToReceiveVideo": "true"],
@@ -277,6 +298,8 @@ public actor WebRTCFacade {
     }
 
     public func close() async {
+        statsTask?.cancel()
+        statsTask = nil
         peerConnection?.close()
         peerConnection = nil
         delegate = nil
@@ -292,6 +315,7 @@ public actor WebRTCFacade {
         hidReadyStateContinuation.finish()
         incomingRPCFramesContinuation.finish()
         rpcReadyStateContinuation.finish()
+        statsContinuation.finish()
     }
 
     // MARK: - SDP wire format
@@ -381,6 +405,28 @@ public actor WebRTCFacade {
                     cont.resume()
                 }
             }
+        }
+    }
+
+    /// Background loop that walks `RTCPeerConnection.statistics`
+    /// every second and yields a `ConnectionStats` on the stream.
+    /// Cancellation (via Task.cancel) ends the loop and finishes
+    /// the stream from the close() path.
+    private static func runStatsPoller(
+        peerConnection: RTCPeerConnection,
+        continuation: AsyncStream<ConnectionStats>.Continuation?
+    ) async {
+        guard let continuation else { return }
+        var parser = WebRTCStatsParser()
+        while !Task.isCancelled {
+            let report: RTCStatisticsReport = await withCheckedContinuation { cont in
+                peerConnection.statistics { report in
+                    cont.resume(returning: report)
+                }
+            }
+            let sample = parser.parse(report)
+            continuation.yield(sample)
+            try? await Task.sleep(for: .seconds(1))
         }
     }
 }

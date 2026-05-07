@@ -1,7 +1,10 @@
 import AppKit
 import JetKVMProtocol
 import JetKVMTransport
+import OSLog
 import WebRTC
+
+private let log = Logger(subsystem: "app.jetkvm.client", category: "kvm-view")
 
 /// `NSView` that hosts an `RTCMTLNSVideoView` for rendering a JetKVM video
 /// track and captures keyboard/mouse events for forwarding to the host.
@@ -125,11 +128,46 @@ final class KVMVideoView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        window?.makeFirstResponder(self)
+        // Drop any prior didBecomeKey observer (we may be moving from
+        // one window to another, e.g. SwiftUI re-parenting on
+        // representable updates).
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+        guard let window else { return }
+        window.makeFirstResponder(self)
         // Required for mouseMoved delivery. Without this NSWindow only
         // dispatches mouse-button events, not bare-cursor motion.
-        window?.acceptsMouseMovedEvents = true
+        window.acceptsMouseMovedEvents = true
+        // viewDidMoveToWindow only fires once when we're added. Without
+        // this observer, when a second KVM window opens and steals key
+        // status, then the user clicks back to this one, NSWindow's
+        // remembered first responder may have been lost and keystrokes
+        // would have nowhere to go. Re-establishing on every become-key
+        // is cheap insurance.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowBecameKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: window
+        )
     }
+
+    @objc private func windowBecameKey(_ notification: Notification) {
+        guard let window else { return }
+        if window.firstResponder !== self {
+            log.debug("window became key — re-establishing first responder")
+            window.makeFirstResponder(self)
+        }
+    }
+
+    /// Make a click in a non-key window both activate the window and
+    /// land in our event handlers. Without this, the first click on an
+    /// unfocused window is silently consumed by activation, which feels
+    /// broken with multiple KVM windows open.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     // MARK: - Keyboard events
 

@@ -101,13 +101,6 @@ struct KVMWindowView: View {
             StatusStrip()
         }
         .toolbar {
-            ToolbarItem(placement: .navigation) {
-                if let device = session.device {
-                    Text(device.deviceID)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Toggle(isOn: keyboardCaptureBinding) {

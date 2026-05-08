@@ -50,6 +50,22 @@ extension Session {
         try await rpcNotify(method: "setStreamQualityFactor", params: Params(factor: factor))
     }
 
+    // MARK: - Scroll wheel
+    //
+    // Scroll lives on the JSON-RPC channel rather than the binary
+    // HID-RPC channel: the server's `wheelReport` method funnels
+    // wheelY/wheelX into the same `gadget.{Abs,Rel}MouseWheelReport`
+    // HID gadget call the keyboard / mouse paths use. Notify (no
+    // response) so we don't pay a round-trip per scroll event.
+
+    public func sendWheelReportRPC(wheelY: Int8, wheelX: Int8) async throws {
+        struct Params: Encodable, Sendable {
+            let wheelY: Int8
+            let wheelX: Int8
+        }
+        try await rpcNotify(method: "wheelReport", params: Params(wheelY: wheelY, wheelX: wheelX))
+    }
+
     // MARK: - State
 
     public func getVideoState() async throws -> VideoState {

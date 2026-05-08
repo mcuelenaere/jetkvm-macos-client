@@ -8,10 +8,12 @@ import Foundation
 /// `internal/hidrpc/hidrpc.go:13-25` and per-message payload shapes in
 /// `internal/hidrpc/message.go`.
 ///
-/// Opcode 0x04 (`WheelReport`) is defined server-side but has no
-/// encoder, decoder, or handler anywhere in the JetKVM tree (verified
-/// 2026-05). It's intentionally omitted here; if we ever need scroll
-/// wheel support we'll have to design the wire format ourselves.
+/// Opcode 0x04 (`WheelReport`) is reserved server-side but has no
+/// encoder/decoder/handler on the binary HID-RPC channel (verified
+/// 2026-05). Scroll wheel support is delivered through the JSON-RPC
+/// channel instead — the server exposes a `wheelReport(wheelY, wheelX)`
+/// method that funnels into the same `gadget.{Abs,Rel}MouseWheelReport`
+/// HID gadget call. Session.sendWheelReport(...) is the typed wrapper.
 public enum HIDRPCMessage: Sendable, Equatable {
     /// HID-RPC protocol version. The server enforces a handshake on the
     /// `hidrpc` channel before it'll act on any input.

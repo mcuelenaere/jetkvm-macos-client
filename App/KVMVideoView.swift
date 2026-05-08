@@ -213,6 +213,47 @@ final class KVMVideoView: NSView {
     override func otherMouseDown(with event: NSEvent) { sendPointer(event: event, motion: false) }
     override func otherMouseUp(with event: NSEvent) { sendPointer(event: event, motion: false) }
 
+    /// Fractional accumulators for trackpad scroll events. NSEvent
+    /// delivers very small deltas (sub-line) when the user drags two
+    /// fingers slowly; rounding each one to Int8 individually would
+    /// truncate everything to zero. Accumulate, emit on full units,
+    /// keep the fractional remainder for the next event.
+    private var scrollAccumY: CGFloat = 0
+    private var scrollAccumX: CGFloat = 0
+
+    /// Pixels-per-line scaling factor for trackpad precise scrolling.
+    /// macOS reports trackpad scroll in pixels and mouse wheel scroll
+    /// in lines; collapse both to "lines" so we send a sane Int8
+    /// magnitude to the JetKVM gadget.
+    private static let pixelsPerLine: CGFloat = 16
+
+    override func scrollWheel(with event: NSEvent) {
+        let dx: CGFloat
+        let dy: CGFloat
+        if event.hasPreciseScrollingDeltas {
+            dx = event.scrollingDeltaX / Self.pixelsPerLine
+            dy = event.scrollingDeltaY / Self.pixelsPerLine
+        } else {
+            dx = event.scrollingDeltaX
+            dy = event.scrollingDeltaY
+        }
+        scrollAccumY += dy
+        scrollAccumX += dx
+        let yInt = Int(scrollAccumY.rounded(.towardZero))
+        let xInt = Int(scrollAccumX.rounded(.towardZero))
+        if yInt == 0 && xInt == 0 { return }
+        scrollAccumY -= CGFloat(yInt)
+        scrollAccumX -= CGFloat(xInt)
+        // NSEvent.scrollingDeltaY is positive when the user scrolled
+        // up (content scrolls up). The HID wheel field on Linux/macOS
+        // hosts also treats positive Y as "wheel rotated up = page
+        // scrolls up". So the sign passes through unchanged.
+        session?.sendWheelReport(
+            wheelY: Int8(clamping: yInt),
+            wheelX: Int8(clamping: xInt)
+        )
+    }
+
     private func sendPointer(event: NSEvent, motion: Bool) {
         guard let session else { return }
         let buttons = MouseButtons(rawValue: UInt8(truncatingIfNeeded: NSEvent.pressedMouseButtons))

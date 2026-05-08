@@ -375,6 +375,24 @@ public final class Session {
         Task { await webrtc.sendHID(message, on: .unreliableOrdered) }
     }
 
+    /// Forward a scroll-wheel event. Routes through JSON-RPC's
+    /// `wheelReport` rather than the binary HID-RPC channel — the
+    /// binary opcode for wheel reports is unimplemented server-side
+    /// (see HIDRPCMessage.swift). Fire-and-forget; failures are
+    /// logged but not propagated, matching sendKeypress / sendPointer
+    /// semantics so call sites don't have to await.
+    public func sendWheelReport(wheelY: Int8, wheelX: Int8) {
+        guard rpcReady else { return }
+        if wheelY == 0 && wheelX == 0 { return }
+        Task { [weak self] in
+            do {
+                try await self?.sendWheelReportRPC(wheelY: wheelY, wheelX: wheelX)
+            } catch {
+                log.error("wheelReport(y=\(wheelY, privacy: .public), x=\(wheelX, privacy: .public)) failed: \(describe(error), privacy: .public)")
+            }
+        }
+    }
+
     // MARK: - Internal pumps
 
     private func startPumps(

@@ -121,6 +121,14 @@ public actor JSONRPCClient {
             log.notice("rpc server error for \(method, privacy: .public) id=\(id, privacy: .public): \(serverError.code, privacy: .public) \(serverError.message, privacy: .public)")
             throw JSONRPCClientError.server(serverError)
         }
+        // For void-result calls (R == VoidValue) skip the result
+        // decode entirely. JetKVM's response for void methods is
+        // `{"jsonrpc":"2.0","id":N}` with no `result` key — decoding
+        // ResultEnvelope<VoidValue> would fail on the missing key.
+        // Type-equality guarded so the as! is safe.
+        if R.self == VoidValue.self {
+            return VoidValue() as! R
+        }
         do {
             let envelope = try decoder.decode(ResultEnvelope<R>.self, from: responseData)
             return envelope.result
@@ -130,63 +138,21 @@ public actor JSONRPCClient {
         }
     }
 
-    /// Send a request and await the response, but only decode the
-    /// header (id + error). The body's `result` field — which JetKVM
-    /// omits entirely for void methods — is ignored.
+    /// Convenience wrapper around `call<R>()` for methods that don't
+    /// return a useful payload. Uses `VoidValue` as the type
+    /// parameter so the caller doesn't have to write the `let _:
+    /// VoidValue = ...` dance.
     ///
     /// Why not a real JSON-RPC 2.0 notification (no `id`)? Per spec
     /// notifications are unconfirmable: the server cannot signal
-    /// errors back, including `"Method not found"`. We want to know
-    /// when a setter was rejected (e.g. the device is running
-    /// firmware without a method we use), so we keep the request /
-    /// response round-trip and just skip the success-payload decode.
-    /// Used to be called `notify()`; renamed because despite the
-    /// name it never sent a JSON-RPC notification.
+    /// errors back, including `"Method not found"`. We want to see
+    /// those (e.g. the device is running firmware without a method
+    /// we use), so we keep the request / response round-trip.
     public func callVoid(
         method: String,
         params: some Encodable & Sendable = EmptyParams()
     ) async throws {
-        let id = nextID
-        nextID += 1
-
-        let request = JSONRPCRequest(method: method, params: params, id: id)
-        let requestData: Data
-        do {
-            requestData = try encoder.encode(request)
-        } catch {
-            throw JSONRPCClientError.encoding(String(describing: error))
-        }
-        guard let frame = String(data: requestData, encoding: .utf8) else {
-            throw JSONRPCClientError.encoding("UTF-8 round-trip failed")
-        }
-
-        let responseData: Data = try await withCheckedThrowingContinuation { continuation in
-            pending[id] = continuation
-            Task { [send] in
-                let ok = await send(frame)
-                if !ok {
-                    log.error("rpc send failed for \(method, privacy: .public) id=\(id, privacy: .public)")
-                    if let pending = await self.takePending(id) {
-                        pending.resume(throwing: JSONRPCClientError.sendFailed)
-                    }
-                }
-            }
-        }
-
-        let header: ResponseHeader
-        do {
-            header = try decoder.decode(ResponseHeader.self, from: responseData)
-        } catch {
-            log.error("rpc response header decode failed for \(method, privacy: .public) id=\(id, privacy: .public): \(String(describing: error), privacy: .public)")
-            throw JSONRPCClientError.malformedResponse(String(describing: error))
-        }
-        if let serverError = header.error {
-            log.notice("rpc server error for \(method, privacy: .public) id=\(id, privacy: .public): \(serverError.code, privacy: .public) \(serverError.message, privacy: .public)")
-            throw JSONRPCClientError.server(serverError)
-        }
-        // Success: the response may contain `"result": null`,
-        // `"result": <something>`, or no result key at all
-        // (JetKVM's void methods). We don't care which.
+        let _: VoidValue = try await call(method: method, params: params)
     }
 
     /// Called by the rpc channel handler for each incoming text frame.

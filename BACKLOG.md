@@ -5,107 +5,36 @@ to be picked up cold without re-litigating the original investigation.
 
 ---
 
-## Remove the explicit "Capture" toolbar toggle (auto-engage)
+## Improve scroll performance for trackpads (e.g. MacBook Pro)
 
-**Where:** `App/KVMWindowView.swift` (toolbar item),
-`App/KeyboardCapturer.swift` (toggle/state machine),
-`App/KVMVideoView.swift` (mouse-in-view tracking).
+**Symptom:** trackpad scrolling on the host feels chunky and
+bursty. A real scroll wheel feels fine — it fires at ~5-10
+detents/sec, one tick per detent. macOS trackpads fire
+`NSEvent.scrollWheel` at 60-120Hz, and our per-event JSON-RPC
+`wheelReport` (`Session.sendWheelReport` →
+`Session+RPC.sendWheelReportRPC`) eats real time on encode +
+WebRTC SCTP transit + decode + dispatch on the host. TigerVNC's
+VNC fork doesn't exhibit this on the same hardware because its
+wheel path is an in-process call — no per-tick parsing overhead.
 
-**What's there now:** the user has to click a "Capture" toolbar
-toggle the first time to grant Accessibility permission and engage
-the CGEventTap. After that, focus-loss / focus-gain auto-suspends
-and resumes the tap, so the toggle is a one-time-per-session
-gesture once permission is granted.
+**Two paths, roughly cheapest first:**
 
-**Why remove it:** the toggle is a UX wart. The user's mental model
-is "I'm in the JetKVM window, all my keystrokes go to the host;
-I'm somewhere else, they don't" — exactly what the auto-pause
-already does on app focus. The explicit toggle adds a step.
+1. **Client-side coalescing in `KVMVideoView.scrollWheel`.**
+   Accumulate deltas over a ~16ms window, fire one `wheelReport`
+   per window with the summed deltas. JetKVM's web frontend
+   already does this (its `scrollThrottling` setting). Pure
+   client change, no server impact, probably enough on its own.
 
-**Proposed model:** capture engages automatically whenever
-(a) the JetKVM window is the key window, **and**
-(b) the mouse cursor is inside the `KVMVideoView`.
-Disengages when either is false. No toolbar item.
+2. **Binary HID-RPC opcode for wheel.** `internal/hidrpc/hidrpc.go`
+   already defines `TypeWheelReport = 0x04` but the dispatch is
+   missing from `handleHidRPCMessage`'s switch — every wheel
+   tick takes the JSON-RPC slow path instead. A two-byte binary
+   frame over the unreliable-ordered HID channel would skip JSON
+   entirely. Requires an upstream JetKVM patch; client side is
+   ~3 small edits in `JetKVMProtocol/Codec/HIDRPCMessage.swift`,
+   `Session.sendWheelReport`, and `KVMVideoView.scrollWheel`.
 
-The "mouse in view" condition is the safety hatch for cases where
-the user wants to use system shortcuts on the client without losing
-the connection — they nudge the cursor outside the view (or to the
-title bar) and Cmd+Tab works normally.
-
-**Implementation outline:**
-1. `KVMVideoView`: track mouse-in-view via `mouseEntered` /
-   `mouseExited`, with an `NSTrackingArea` covering bounds. Forward
-   transitions to a callback.
-2. `KeyboardCapturer`: replace `userIntent` with the AND of
-   "window is key" and "mouse in view"; both are external inputs
-   driven by the view layer.
-3. First-run Accessibility prompt: trigger the system prompt the
-   first time `KVMWindowView` appears with a connected session,
-   not on toolbar click. If denied, fall back to in-window-only
-   capture (no CGEventTap), with a banner explaining the limitation
-   and a "Grant…" button that re-prompts.
-4. Drop the toolbar toggle.
-
----
-
-## Promote scroll wheel to binary HID-RPC (requires upstream JetKVM change)
-
-**Status:** scroll currently goes through JSON-RPC's `wheelReport` method
-(see `Session.sendWheelReport` and `Session+RPC.sendWheelReportRPC`).
-That works but feels chunky over WebRTC because of per-event JSON
-encode/parse overhead — 60+ ticks/sec on a trackpad gesture * ~80 bytes
-JSON = noticeable. The same `gadget.AbsMouseWheelReport` /
-`RelMouseWheelReport` call sits at the bottom either way; the win is
-purely transport overhead (binary opcode is 2 bytes total, no JSON).
-
-**Symptom is trackpad-specific.** A real scroll wheel feels fine —
-it fires at human rate (~5-10 detents/sec), 1 tick per detent. The
-chunkiness shows up on trackpad where NSEvent.scrollWheel fires at
-60-120Hz, and the per-event JSON-RPC overhead piles up into bursty
-arrivals on the host. So fixes can target trackpad specifically:
-either the binary opcode (this entry), or trackpad-side
-throttling/coalescing in `KVMVideoView.scrollWheel` (cheaper, but
-treats the symptom). TigerVNC + their VNC server fork doesn't
-exhibit this even with the same `rpcWheelReport` path because RFB
-→ in-process call has no per-tick parsing overhead.
-
-**Where (server):** `internal/hidrpc/hidrpc.go` defines
-`TypeWheelReport = 0x04`; the handler is missing in `hidrpc.go`'s
-`handleHidRPCMessage` switch. Suggested patch (already prototyped in
-the `claude/keen-matsumoto-e7e340` worktree of the JetKVM repo):
-
-1. **Wire format.** One signed byte: `[deltaY: i8]`. Vertical only —
-   horizontal wheel events are rare on a KVM use case.
-2. **Decoder** in `internal/hidrpc/message.go`: a `WheelReport()`
-   accessor returning `(deltaY int8, err)`, same length-strict pattern
-   as `MouseReport()`.
-3. **Dispatch** in `hidrpc.go`: case for `TypeWheelReport` that
-   decodes and calls `rpcWheelReport(wheel.DeltaY, 0)` — the existing
-   in-process JSON-RPC handler.
-4. **No gadget changes needed.** The HID descriptor already supports
-   wheel deltas (verified via the working JSON-RPC path).
-
-**Compatibility:** purely additive. Old clients (browser UI, our
-JSON-RPC client) keep working; new clients gain a faster path.
-
-**Client-side migration when this lands:**
-
-1. `Packages/JetKVMProtocol/Sources/JetKVMProtocol/Codec/HIDRPCMessage.swift` —
-   add a `wheelReport(deltaY: Int8)` case + encoder.
-2. `Packages/JetKVMTransport/Sources/JetKVMTransport/Session.swift` —
-   `sendWheelReport(...)` switches from `sendWheelReportRPC` to
-   `webrtc.sendHID(.wheelReport(deltaY:), on: .unreliableOrdered)`.
-   Remove the `Session+RPC.sendWheelReportRPC` method.
-3. `App/KVMVideoView.swift` — drop the X axis from the API surface
-   (binary protocol is Y-only), simplify the accumulator if needed.
-
-**Tuning if it's still not as smooth as VNC's in-process scroll:**
-the bottleneck after binary HID-RPC will be the WebRTC SCTP path
-itself. Coalescing multiple NSEvent.scrollWheel events into one
-wheel report (e.g., 16ms throttle with summed deltas) can cut the
-event count further; the JetKVM web frontend already does this
-via its `scrollThrottling` setting. But that's only worth doing
-after measuring; binary HID-RPC alone may be fast enough.
+Measure before doing both — coalescing alone may close the gap.
 
 ---
 
@@ -223,60 +152,3 @@ clipboard would require a host-side helper app, which is a
 significant scope expansion (signed installer, auto-launch,
 update mechanism, per-OS variants for macOS / Linux / Windows
 hosts). Worth noting only as a non-goal.
-
----
-
-## Re-add support for JetKVM's default self-signed TLS certificate
-
-**Where:** `Packages/JetKVMTransport/Sources/JetKVMTransport/TLSDelegate.swift`,
-`DeviceEndpoint.swift`, `App/ConnectView.swift`.
-
-**What's there now:** the connect form has an HTTPS toggle but **no**
-"Trust self-signed" toggle. `DeviceEndpoint.allowSelfSignedCertificate`
-is preserved as transport API but never set true. `TLSDelegate` is
-installed but falls through to default trust handling.
-
-**The bug we hit:** with HTTPS to a default-config JetKVM (self-signed
-cert with the `JetKVM Self-Signed CA` issuer), Apple's
-Network.framework BoringSSL fails the handshake at
-`boringssl_session_set_peer_verification_state_from_session` with
-"Unable to extract cached certificates from the SSL_SESSION object",
-*before* the cert-verification callback hands off to URLSession's
-delegate. The `[app.jetkvm.client:tls]` log category stayed empty in
-testing — our delegate is never invoked, so neither
-`URLCredential(trust:)` nor `SecTrustSetExceptions` ever runs. Confirmed
-on macOS 26.4 with WebRTC pinned to M140 and Xcode 26.4.1.
-
-**Things that didn't help:**
-
-- `NSAllowsArbitraryLoads = true` in Info.plist (kept for HTTP).
-- Capping `tlsMaximumSupportedProtocolVersion` to TLS 1.2 (same error;
-  not a 1.3-only bug).
-- Implementing both session-level and task-level
-  `urlSession(_:didReceive:completionHandler:)` methods.
-- `SecTrustSetExceptions` to bypass cert + hostname validation (never
-  reached).
-
-**Real fix options, roughly cheapest first:**
-
-1. **Trust-on-first-use cert pinning.** First connection prompts the
-   user to confirm the cert's SHA-256 fingerprint; we store it in
-   Keychain keyed by device ID, and on subsequent connects we pin the
-   exact cert. Implementing this requires bypassing URLSession's TLS
-   path entirely (NWConnection with `tls_options_set_verify_block`)
-   since URLSession's delegate isn't getting the chance.
-2. **Bundle the JetKVM CA cert** in the app bundle and install it into
-   a per-session `SecTrust` evaluation pipeline. Doesn't require user
-   interaction. Needs investigation of whether Network.framework
-   exposes a "use this anchor cert for this session" hook that doesn't
-   trigger the same verification-callback bridge bug.
-3. **Add the JetKVM CA cert to the user's keychain** at first connect
-   (with explicit consent). Works with vanilla URLSession because the
-   cert chain validates against the system trust store. Invasive — we'd
-   modify the user's system trust state — but most reliable.
-
-**For now:** users connect over HTTP for the LAN case (which is what
-JetKVM ships with by default). The HTTPS toggle still works against a
-JetKVM behind a reverse proxy with a real CA-issued cert. This is
-documented in `DeviceEndpoint.allowSelfSignedCertificate`'s comment
-and surfaced in the HTTPS toggle's tooltip in the UI.

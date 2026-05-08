@@ -312,6 +312,63 @@ extension KVMVideoView: RTCVideoViewDelegate {
         if size.width > 0, size.height > 0 {
             session?.markFirstFrameReceived()
         }
+        let previousAspect: CGFloat = (videoSize.height > 0)
+            ? videoSize.width / videoSize.height
+            : 0
         videoSize = size
+        guard size.width > 0, size.height > 0 else { return }
+        let newAspect = size.width / size.height
+        // Resize the window to match the video aspect on each genuine
+        // aspect change — typically the first frame, or a host
+        // resolution change mid-session. Matching aspect already
+        // (within 1%) means no work needed; this also preserves the
+        // user's manual window resize across reconnects when the
+        // aspect they picked already fits.
+        if abs(newAspect - previousAspect) > 0.01 {
+            DispatchQueue.main.async { [weak self] in
+                self?.resizeWindowToVideoAspect(newAspect)
+            }
+        }
+    }
+}
+
+extension KVMVideoView {
+    /// Adjust the host NSWindow so that this view's bounds match
+    /// `videoAspect`. We change the height (keeping width) anchored
+    /// to the window's top-left, so the title-bar position is stable.
+    /// No-op when fullscreen, miniaturized, or the bounds aspect
+    /// already matches.
+    fileprivate func resizeWindowToVideoAspect(_ videoAspect: CGFloat) {
+        guard let window else { return }
+        if window.styleMask.contains(.fullScreen) { return }
+        if window.isMiniaturized { return }
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let currentAspect = bounds.width / bounds.height
+        if abs(currentAspect - videoAspect) < 0.01 { return }
+        // Keep the video-area width, derive the new height from the
+        // target aspect, then fold that delta into the window frame.
+        // (Window chrome — title bar, toolbar, status strip — stays
+        // its own height; we just grow/shrink the video area.)
+        let newBoundsHeight = bounds.width / videoAspect
+        let deltaHeight = newBoundsHeight - bounds.height
+        var newFrame = window.frame
+        newFrame.size.height += deltaHeight
+        newFrame.origin.y -= deltaHeight  // anchor top edge
+        // Clamp so we don't end up off-screen or taller than the
+        // visible area of the active screen.
+        if let visible = window.screen?.visibleFrame {
+            if newFrame.height > visible.height {
+                let scale = visible.height / newFrame.height
+                newFrame.size.height = visible.height
+                newFrame.size.width = newFrame.width * scale
+            }
+            if newFrame.maxY > visible.maxY {
+                newFrame.origin.y = visible.maxY - newFrame.height
+            }
+            if newFrame.minY < visible.minY {
+                newFrame.origin.y = visible.minY
+            }
+        }
+        window.setFrame(newFrame, display: true, animate: true)
     }
 }

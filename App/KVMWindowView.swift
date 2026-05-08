@@ -57,55 +57,56 @@ struct KVMWindowView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                if let track = session.videoTrack {
-                    KVMVideoRepresentable(
-                        track: track,
-                        session: session,
-                        pointerLocked: pointerLock.state == .enabled
-                    )
-                } else {
-                    ProgressView("Waiting for video…")
-                        .controlSize(.large)
-                        .foregroundStyle(.white)
-                }
-                // Stack of top-of-window banners. Most-severe first.
-                VStack(spacing: 8) {
-                    if case .kicked = session.state {
-                        banner(
-                            "Another peer connected to this device — your session was taken over.",
-                            background: .red,
-                            foreground: .white
-                        )
-                    }
-                    if case .reconnecting(let attempt) = session.state {
-                        banner(
-                            "Connection lost — reconnecting (attempt \(attempt))…",
-                            background: .orange,
-                            foreground: .black
-                        )
-                    }
-                    if let failsafe = session.failsafe, failsafe.active {
-                        banner(
-                            "Device is in failsafe mode: \(failsafe.reason)",
-                            background: .red,
-                            foreground: .white
-                        )
-                    }
-                    if case .awaitingAccessibility = capturer.state {
-                        banner(
-                            "Grant Accessibility permission to capture system shortcuts (Cmd+Tab, Cmd+Space, …), then click Capture again.",
-                            background: .yellow,
-                            foreground: .black
-                        )
-                    }
-                    Spacer()
-                }
-                .padding()
+        // No StatusStrip in here — it lives in KVMSessionWindow's
+        // outer VStack so it stays visible during the
+        // ConnectionStatusView overlay's "Receiving video stream…"
+        // phase. The overlay only covers the video area then.
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let track = session.videoTrack {
+                KVMVideoRepresentable(
+                    track: track,
+                    session: session,
+                    pointerLocked: pointerLock.state == .enabled
+                )
+            } else {
+                ProgressView("Waiting for video…")
+                    .controlSize(.large)
+                    .foregroundStyle(.white)
             }
-            StatusStrip()
+            // Stack of top-of-window banners. Most-severe first.
+            VStack(spacing: 8) {
+                if case .kicked = session.state {
+                    banner(
+                        "Another peer connected to this device — your session was taken over.",
+                        background: .red,
+                        foreground: .white
+                    )
+                }
+                if case .reconnecting(let attempt) = session.state {
+                    banner(
+                        "Connection lost — reconnecting (attempt \(attempt))…",
+                        background: .orange,
+                        foreground: .black
+                    )
+                }
+                if let failsafe = session.failsafe, failsafe.active {
+                    banner(
+                        "Device is in failsafe mode: \(failsafe.reason)",
+                        background: .red,
+                        foreground: .white
+                    )
+                }
+                if case .awaitingAccessibility = capturer.state {
+                    banner(
+                        "Grant Accessibility permission to capture system shortcuts (Cmd+Tab, Cmd+Space, …), then click Capture again.",
+                        background: .yellow,
+                        foreground: .black
+                    )
+                }
+                Spacer()
+            }
+            .padding()
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

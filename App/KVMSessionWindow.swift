@@ -15,23 +15,28 @@ struct KVMSessionWindow: View {
     @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
-        ZStack {
-            // Always render the KVM view once we've reached .connected
-            // so the video track has a stable host across redraws.
-            // The status overlay sits on top of it for the brief
-            // .connecting / .reconnecting / .failed phases — which
-            // matches how a paid RDP client behaves: don't yank the
-            // session on a transient blip.
-            if isConnectedOrLater {
-                KVMWindowView()
+        // VStack(ZStack(KVM + overlay), StatusStrip): the StatusStrip
+        // sits BELOW the overlay-stacked region so it remains visible
+        // during the ConnectionStatusView "Receiving video stream…"
+        // phase. The overlay only covers the video area, not the
+        // status bar — gives the user FPS/RTT/etc. as soon as they're
+        // available.
+        VStack(spacing: 0) {
+            ZStack {
+                if isConnectedOrLater {
+                    KVMWindowView()
+                }
+                if shouldShowOverlay {
+                    ConnectionStatusView(
+                        host: host,
+                        onCancel: { dismissWindow() },
+                        onRetry: { Task { await connect() } }
+                    )
+                    .transition(.opacity)
+                }
             }
-            if shouldShowOverlay {
-                ConnectionStatusView(
-                    host: host,
-                    onCancel: { dismissWindow() },
-                    onRetry: { Task { await connect() } }
-                )
-                .transition(.opacity)
+            if isConnectedOrLater {
+                StatusStrip()
             }
         }
         .environment(session)

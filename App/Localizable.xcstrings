@@ -1,0 +1,219 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "•" : {
+
+    },
+    "A loose or faulty HDMI connection" : {
+
+    },
+    "Add a new host." : {
+
+    },
+    "Add Host" : {
+
+    },
+    "Address" : {
+
+    },
+    "Another peer connected to this device — your session was taken over." : {
+
+    },
+    "Auto" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Capture system keyboard shortcuts (Cmd+Tab, Cmd+Space, …) and/or lock the pointer for relative mouse mode. Keyboard requires Accessibility permission." : {
+
+    },
+    "Click + in the toolbar to add a JetKVM device, or wait for one to appear on your local network." : {
+
+    },
+    "Codec" : {
+
+    },
+    "Codec preference" : {
+
+    },
+    "Connect to %@" : {
+
+    },
+    "Connection lost — reconnecting (attempt %lld)…" : {
+
+    },
+    "Controls" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete %@" : {
+
+    },
+    "Delete %@?" : {
+
+    },
+    "Device is in failsafe mode: %@" : {
+
+    },
+    "Device requires a password." : {
+
+    },
+    "Disconnect" : {
+
+    },
+    "Don't show this again" : {
+
+    },
+    "Edit %@" : {
+
+    },
+    "Edit…" : {
+
+    },
+    "Enter a hostname or http(s) URL." : {
+
+    },
+    "Force Off" : {
+
+    },
+    "Force Off…" : {
+
+    },
+    "Force-power off?" : {
+
+    },
+    "Grant Accessibility permission to capture system shortcuts (Cmd+Tab, Cmd+Space, …), then click Capture again." : {
+
+    },
+    "H.264" : {
+
+    },
+    "H.265" : {
+
+    },
+    "HDMI signal error detected." : {
+
+    },
+    "Holds the power button for 5 seconds." : {
+
+    },
+    "https://kvm.local or kvm.local" : {
+
+    },
+    "Incompatible resolution or refresh rate settings" : {
+
+    },
+    "Issues with the source device's HDMI output" : {
+
+    },
+    "JetKVM" : {
+
+    },
+    "JetKVM Session" : {
+
+    },
+    "Keyboard lock" : {
+
+    },
+    "Live network and video diagnostics." : {
+
+    },
+    "Lock pointer" : {
+
+    },
+    "Lock pointer to JetKVM?" : {
+
+    },
+    "My desktop" : {
+
+    },
+    "Name (optional)" : {
+
+    },
+    "No saved hosts" : {
+
+    },
+    "Off" : {
+
+    },
+    "On" : {
+
+    },
+    "Password" : {
+
+    },
+    "Pointer lock" : {
+
+    },
+    "Power" : {
+
+    },
+    "Power, codec, and quality controls." : {
+
+    },
+    "Receiving video stream…" : {
+
+    },
+    "Remember password" : {
+
+    },
+    "Reset" : {
+
+    },
+    "Reset host?" : {
+
+    },
+    "Reset…" : {
+
+    },
+    "Retry" : {
+
+    },
+    "Save Host" : {
+
+    },
+    "Save the password to the macOS Keychain so it auto-fills next time you connect to this host." : {
+
+    },
+    "Sends the reset signal to the host." : {
+
+    },
+    "Session totals" : {
+
+    },
+    "Sign In" : {
+
+    },
+    "Stats" : {
+
+    },
+    "Stream quality" : {
+
+    },
+    "t" : {
+
+    },
+    "Takes effect on next reconnect." : {
+
+    },
+    "The connected computer is powered off or asleep" : {
+
+    },
+    "This removes the saved entry. The device itself isn't affected." : {
+
+    },
+    "v" : {
+
+    },
+    "Waiting for video…" : {
+
+    },
+    "Your cursor will be hidden and pinned to this window, and mouse movement sent as relative deltas to the device.\n\nTo release the lock, press and hold ⌃⌥ (Control + Option) for half a second." : {
+
+    }
+  },
+  "version" : "1.0"
+}

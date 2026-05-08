@@ -27,6 +27,7 @@
 		FF00000000000000000000FF /* KVMSessionWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F600000000000000000000F6 /* KVMSessionWindow.swift */; };
 		1A00000000000000000000A1 /* DiscoveredHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B1 /* DiscoveredHost.swift */; };
 		1A00000000000000000000A2 /* DeviceDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B2 /* DeviceDiscovery.swift */; };
+		2A00000000000000000000A1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2A00000000000000000000B1 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +50,7 @@
 		F600000000000000000000F6 /* KVMSessionWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMSessionWindow.swift; sourceTree = "<group>"; };
 		1A00000000000000000000B1 /* DiscoveredHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveredHost.swift; sourceTree = "<group>"; };
 		1A00000000000000000000B2 /* DeviceDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiscovery.swift; sourceTree = "<group>"; };
+		2A00000000000000000000B1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -86,6 +88,7 @@
 				F200000000000000000000F2 /* HostStore.swift */,
 				1A00000000000000000000B1 /* DiscoveredHost.swift */,
 				1A00000000000000000000B2 /* DeviceDiscovery.swift */,
+				2A00000000000000000000B1 /* Localizable.xcstrings */,
 				C500000000000000000000C5 /* KVMWindowView.swift */,
 				C600000000000000000000C6 /* KVMVideoView.swift */,
 				C700000000000000000000C7 /* KeyboardCapturer.swift */,
@@ -183,6 +186,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2A00000000000000000000A1 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

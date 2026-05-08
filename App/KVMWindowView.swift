@@ -237,19 +237,19 @@ struct KVMWindowView: View {
             return
         }
         let alert = NSAlert()
-        alert.messageText = "Lock pointer to JetKVM?"
-        alert.informativeText = """
+        alert.messageText = String(localized: "Lock pointer to JetKVM?")
+        alert.informativeText = String(localized: """
             Your cursor will be hidden and pinned to this window, and mouse \
             movement sent as relative deltas to the device.
 
             To release the lock, press and hold ⌃⌥ (Control + Option) for half \
             a second.
-            """
+            """)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Lock pointer")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Lock pointer"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         let checkbox = NSButton(
-            checkboxWithTitle: "Don't show this again",
+            checkboxWithTitle: String(localized: "Don't show this again"),
             target: nil,
             action: nil
         )
@@ -264,8 +264,11 @@ struct KVMWindowView: View {
 
     /// Top-of-window banner used for kicked / failsafe / accessibility
     /// states. All read better as a pinned strip than a popup, so we
-    /// stack them at the top of the video view.
-    private func banner(_ text: String, background: Color, foreground: Color) -> some View {
+    /// stack them at the top of the video view. Takes LocalizedStringKey
+    /// (not String) so the Text initializer goes through the
+    /// auto-localizing path — call sites pass string literals which
+    /// Swift infers to the right type.
+    private func banner(_ text: LocalizedStringKey, background: Color, foreground: Color) -> some View {
         Text(text)
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -323,7 +326,7 @@ private struct NoSignalPlaceholder: View {
         .shadow(radius: 16)
     }
 
-    private func bullet(_ text: String) -> some View {
+    private func bullet(_ text: LocalizedStringKey) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("•")
             Text(text)

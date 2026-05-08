@@ -68,11 +68,12 @@ struct KVMSessionWindow: View {
         case .idle, .connecting, .awaitingPassword, .failed:
             return true
         case .connected:
-            // ICE is up but the video track may take a beat to land
-            // — keep the overlay so the spinner stays visible across
-            // that gap (otherwise the user sees a blank black window
-            // for a second).
-            return session.videoTrack == nil
+            // ICE is up and the track is attached, but actual frames
+            // can take hundreds of ms to start rendering. Keep the
+            // overlay until the renderer reports a non-zero video
+            // size (markFirstFrameReceived); otherwise the user sees
+            // a blank black window for a beat.
+            return !session.hasReceivedFirstFrame
         case .reconnecting, .kicked:
             return false
         }

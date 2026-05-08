@@ -30,11 +30,13 @@ struct ConnectionStatusView: View {
         if case .failed(let msg) = session.state { return msg } else { return nil }
     }
 
-    /// True between ICE-connected and the first remote video track
-    /// arriving. KVMSessionWindow keeps the overlay visible across
+    /// True between ICE-connected and the first video frame actually
+    /// rendering. KVMSessionWindow keeps the overlay visible across
     /// this gap so we own the "video is on its way" affordance here.
     private var isAwaitingVideo: Bool {
-        if case .connected = session.state, session.videoTrack == nil { return true }
+        if case .connected = session.state, !session.hasReceivedFirstFrame {
+            return true
+        }
         return false
     }
 

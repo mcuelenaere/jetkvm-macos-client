@@ -22,15 +22,6 @@ struct HostsView: View {
                 List(store.hosts, selection: $selection) { host in
                     HostRow(host: host, onConnect: { connect(host) })
                         .tag(host.id)
-                        .contentShape(Rectangle())
-                        // simultaneousGesture lets the List's native
-                        // selection (single-click via NSTableView)
-                        // still happen while we also catch the
-                        // double-click. A plain `.onTapGesture(count:
-                        // 2)` would intercept clicks before selection.
-                        .simultaneousGesture(
-                            TapGesture(count: 2).onEnded { connect(host) }
-                        )
                         .contextMenu {
                             Button("Connect") { connect(host) }
                             Button("Edit…") { editing = host }
@@ -41,6 +32,19 @@ struct HostsView: View {
                         }
                 }
                 .listStyle(.inset)
+                // Enter on the selected row connects. Double-clicking
+                // a row would be the natural macOS gesture, but
+                // SwiftUI's List on macOS doesn't expose a per-row
+                // double-click hook that doesn't break NSTableView's
+                // native single-click selection — the per-row "play"
+                // button is the explicit alternative for mouse users.
+                .onKeyPress(.return) {
+                    guard let id = selection, let host = store.find(id: id) else {
+                        return .ignored
+                    }
+                    connect(host)
+                    return .handled
+                }
             }
         }
         .frame(minWidth: 480, minHeight: 360)

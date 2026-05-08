@@ -57,6 +57,14 @@ public final class Session {
     public private(set) var deviceMetadata: DeviceMetadata?
     public private(set) var device: LocalDevice?
     public private(set) var videoTrack: RTCVideoTrack?
+    /// Distinct from `videoTrack != nil` — the track is attached
+    /// during SDP negotiation (well before frames flow), but actual
+    /// pixels can lag by hundreds of ms. The KVMVideoView renderer
+    /// fires `didChangeVideoSize` when the first non-zero-dim frame
+    /// lands; that's our signal that the user is about to see
+    /// something. Used by KVMSessionWindow to keep the connect-flow
+    /// overlay up across the gap.
+    public private(set) var hasReceivedFirstFrame: Bool = false
     /// `true` once the reliable HID-RPC channel is open and the
     /// handshake has been sent. Input handlers should gate on this so
     /// keypress/pointer reports aren't silently dropped server-side
@@ -575,6 +583,16 @@ public final class Session {
         videoTrack = track
     }
 
+    /// Called by KVMVideoView when its `RTCVideoViewDelegate` reports
+    /// a non-zero video size — i.e. frames have actually started
+    /// rendering. Public so the App layer can call into us; idempotent.
+    public func markFirstFrameReceived() {
+        if !hasReceivedFirstFrame {
+            log.info("first video frame rendered")
+            hasReceivedFirstFrame = true
+        }
+    }
+
     private func transition(_ new: State) {
         state = new
     }
@@ -736,6 +754,7 @@ public final class Session {
         signaling = nil
         http = nil
         videoTrack = nil
+        hasReceivedFirstFrame = false
         hidReady = false
         rpcReady = false
         videoState = nil

@@ -307,6 +307,11 @@ final class KVMVideoView: NSView {
 
 extension KVMVideoView: RTCVideoViewDelegate {
     func videoView(_ videoView: RTCVideoRenderer, didChangeVideoSize size: CGSize) {
+        // First non-zero size = first frame has actually rendered.
+        // Tell Session so the connect-flow overlay can come down.
+        if size.width > 0, size.height > 0 {
+            session?.markFirstFrameReceived()
+        }
         videoSize = size
     }
 }

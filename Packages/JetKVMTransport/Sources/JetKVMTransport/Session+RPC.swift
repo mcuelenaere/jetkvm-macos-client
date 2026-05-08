@@ -50,6 +50,22 @@ extension Session {
         try await rpcNotify(method: "setStreamQualityFactor", params: Params(factor: factor))
     }
 
+    // MARK: - Pause / resume video stream
+    //
+    // Lets the client gate WebRTC RTP traffic to keepalive levels
+    // without renegotiating the session, e.g. when the KVM window
+    // is occluded or minimized. The server pauses encoder feed and
+    // forces an IDR on resume so the decoder never sees half-dependent
+    // frames. Both calls are idempotent server-side.
+
+    public func pauseVideoRPC() async throws {
+        try await rpcNotify(method: "pauseVideo")
+    }
+
+    public func resumeVideoRPC() async throws {
+        try await rpcNotify(method: "resumeVideo")
+    }
+
     // MARK: - Scroll wheel
     //
     // Scroll lives on the JSON-RPC channel rather than the binary

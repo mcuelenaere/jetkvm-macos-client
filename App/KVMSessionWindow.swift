@@ -18,6 +18,14 @@ struct KVMSessionWindow: View {
     /// didExitFullScreen notifications. Drives StatusStrip
     /// suppression and the system-presentation-options hide.
     @State private var isFullscreen = false
+    /// Pending pause-after-debounce. Replaced/cancelled whenever the
+    /// window's visibility changes — gives the user a 5s grace period
+    /// before we ask the device to pause encoder feed.
+    @State private var pauseTask: Task<Void, Never>?
+    /// Debounce window before pausing on hide. Quick alt-tab /
+    /// occlusion blips don't trigger a pause / resume cycle (each of
+    /// which costs an IDR on resume).
+    private static let pauseDebounce: Duration = .seconds(5)
     @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
@@ -62,6 +70,10 @@ struct KVMSessionWindow: View {
             // window-close path stays synchronous. The session reaches
             // .idle and gets deallocated when this view's @State drops.
             Task { await session.disconnect() }
+            // Drop any pending pause so it doesn't fire against a
+            // disconnecting / dead session.
+            pauseTask?.cancel()
+            pauseTask = nil
             // If we exit while still fullscreen (e.g. user closes the
             // window from a fullscreen Space), clear our presentation
             // override so the menu bar / dock come back for the next
@@ -91,6 +103,28 @@ struct KVMSessionWindow: View {
             isFullscreen = false
             FullscreenPresentationCounter.shared.exit()
             win.toolbar?.isVisible = true
+        }
+        // Bandwidth gate: pause the encoder feed when the window is
+        // minimized or fully occluded by other windows; resume the
+        // moment it becomes visible again. The pause is debounced
+        // (5s) so a quick alt-tab doesn't cost an IDR on resume.
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSWindow.didChangeOcclusionStateNotification)
+        ) { note in
+            guard (note.object as? NSWindow) === ownWindow else { return }
+            updateBandwidthGate()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSWindow.didMiniaturizeNotification)
+        ) { note in
+            guard (note.object as? NSWindow) === ownWindow else { return }
+            updateBandwidthGate()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSWindow.didDeminiaturizeNotification)
+        ) { note in
+            guard (note.object as? NSWindow) === ownWindow else { return }
+            updateBandwidthGate()
         }
     }
 
@@ -132,6 +166,38 @@ struct KVMSessionWindow: View {
     private func connect() async {
         let saved = PasswordVault.load(for: sessionID.host)
         await session.connect(endpoint: sessionID.endpoint, password: saved)
+    }
+
+    /// Decide whether the encoder feed should be running based on the
+    /// window's current visibility, and schedule pause/resume RPCs to
+    /// reflect that. Visibility = window not minimized AND at least
+    /// partly on-screen (occlusionState includes .visible).
+    ///
+    /// Pause is debounced by `pauseDebounce` so a quick alt-tab
+    /// doesn't trigger the cycle. Resume fires immediately so the
+    /// user never waits for video on returning to the window.
+    private func updateBandwidthGate() {
+        guard let window = ownWindow else { return }
+        let visible = !window.isMiniaturized
+            && window.occlusionState.contains(.visible)
+        if visible {
+            // Cancel any pending pause and resume now. The server's
+            // resume is a no-op when not paused, so spurious calls
+            // are harmless.
+            pauseTask?.cancel()
+            pauseTask = nil
+            session.resumeVideo()
+        } else {
+            // Schedule pause after the debounce window. Replace any
+            // pending one so the timer restarts on each event.
+            pauseTask?.cancel()
+            let session = self.session
+            pauseTask = Task { @MainActor in
+                try? await Task.sleep(for: Self.pauseDebounce)
+                if Task.isCancelled { return }
+                session.pauseVideo()
+            }
+        }
     }
 }
 

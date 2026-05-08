@@ -383,6 +383,38 @@ public final class Session {
         Task { await webrtc.sendHID(message, on: .unreliableOrdered) }
     }
 
+    /// Tell the device to stop pushing video frames to the WebRTC
+    /// track. RTP drops to keepalive levels until `resumeVideo()`
+    /// is called. The data channels (rpc, hidrpc) stay open so
+    /// input forwarding still works through the pause. Fire-and-
+    /// forget; idempotent server-side. Used by the App layer to
+    /// save bandwidth when the KVM window is occluded / minimized.
+    public func pauseVideo() {
+        guard rpcReady else { return }
+        Task { [weak self] in
+            do {
+                try await self?.pauseVideoRPC()
+            } catch {
+                log.error("pauseVideo failed: \(describe(error), privacy: .public)")
+            }
+        }
+    }
+
+    /// Resume video frame delivery after `pauseVideo()`. The server
+    /// forces an IDR before the next sample so the decoder never
+    /// sees a P-frame referencing a dropped reference. Fire-and-
+    /// forget; idempotent server-side.
+    public func resumeVideo() {
+        guard rpcReady else { return }
+        Task { [weak self] in
+            do {
+                try await self?.resumeVideoRPC()
+            } catch {
+                log.error("resumeVideo failed: \(describe(error), privacy: .public)")
+            }
+        }
+    }
+
     /// Forward a scroll-wheel event. Routes through JSON-RPC's
     /// `wheelReport` rather than the binary HID-RPC channel — the
     /// binary opcode for wheel reports is unimplemented server-side

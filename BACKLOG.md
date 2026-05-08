@@ -109,59 +109,6 @@ after measuring; binary HID-RPC alone may be fast enough.
 
 ---
 
-## Pause/resume video for bandwidth savings (requires upstream JetKVM change)
-
-**Status:** intended to save bandwidth by stopping the video stream
-when the KVM window is minimized or fully occluded. Two approaches
-were considered:
-
-1. **WebRTC renegotiation** to direction `.inactive` — canonical, but
-   needs a new `"renegotiate"` signaling message type + state-machine
-   handling on both sides since the existing `"offer"` path means
-   "start a new session, kick the old one" (`handleWebRTCSession` in
-   `web.go`). ~50-80 LOC across server + client.
-2. **Pause/resume JSON-RPC method** — much simpler. Server stops
-   feeding the encoder (or drops frames before pion's track buffer)
-   when paused. ~20 LOC server-side, ~10 LOC client-side. Bandwidth
-   savings are effectively identical — RTP video is ~99% of the
-   stream; STUN/RTCP keepalives are negligible.
-
-**Going with #2.** The renegotiation approach was abandoned because
-the simplicity wins out and there's no observable difference in
-saved bandwidth.
-
-**Server-side outline:**
-
-1. New JSON-RPC methods `pauseVideo()` and `resumeVideo()` in
-   `jsonrpc.go`. Notifies (no return value).
-2. They flip a session-scoped boolean (e.g. `session.videoPaused`).
-3. The video-feed loop checks the flag before pushing a frame to
-   the pion track. When paused, the loop skips frames (or sleeps
-   until resumed).
-4. On resume, force a keyframe so the client doesn't render a
-   stale-and-recovering picture for the first few frames.
-
-**Client-side outline:**
-
-1. `Session+RPC.swift` — add `pauseVideo()` / `resumeVideo()`
-   notify wrappers.
-2. `Session.swift` — public `pauseVideo()` / `resumeVideo()` that
-   gate on `rpcReady` and fire the notify.
-3. `KVMSessionWindow` (or a new `BandwidthGate`) — observe
-   `NSWindow.didMiniaturizeNotification`,
-   `NSWindow.didDeminiaturizeNotification`, and
-   `didChangeOcclusionStateNotification`. Debounce ~5s before
-   pause (so a quick alt-tab doesn't trigger), fire resume
-   immediately on show.
-
-**Fallback if upstream takes a while:** `session.disconnect()` on
-hide debounce, full `session.connect()` on restore. ~2-3s reconnect
-cost on show but zero bandwidth while hidden. Reuses existing
-infrastructure (Keychain auto-fill, exponential-backoff reconnect
-logic in Session.swift).
-
----
-
 ## Rework cookie handling to use a proper cookie jar
 
 **Where:** `Packages/JetKVMTransport/Sources/JetKVMTransport/HTTPClient.swift`

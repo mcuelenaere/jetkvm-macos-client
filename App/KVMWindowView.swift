@@ -63,7 +63,13 @@ struct KVMWindowView: View {
         // phase. The overlay only covers the video area then.
         ZStack {
             Color.black.ignoresSafeArea()
-            if let track = session.videoTrack {
+            if let err = videoSignalError {
+                // Device is reporting an HDMI-side problem (cable
+                // loose, host powered off, unsupported mode, …).
+                // Frames won't flow; show the placeholder instead of
+                // leaving the user staring at a black window.
+                NoSignalPlaceholder(error: err)
+            } else if let track = session.videoTrack {
                 KVMVideoRepresentable(
                     track: track,
                     session: session,
@@ -266,6 +272,62 @@ struct KVMWindowView: View {
             .background(background)
             .foregroundStyle(foreground)
             .cornerRadius(6)
+    }
+
+    /// Trimmed video error string suitable as a "we know there's no
+    /// signal, don't bother spinning" trigger. Mirrors what the
+    /// StatusStrip already shows in red.
+    private var videoSignalError: String? {
+        guard let raw = session.videoState?.error, !raw.isEmpty else { return nil }
+        return raw
+    }
+}
+
+/// Inline placeholder shown over the video area when the JetKVM
+/// reports an HDMI-side problem (no signal, no lock, unsupported
+/// mode). Frames won't be flowing, so the user gets actionable
+/// guidance instead of a black window with a stalled spinner.
+/// Modeled on the JetKVM web frontend's "HDMI signal error" card.
+private struct NoSignalPlaceholder: View {
+    let error: String
+
+    private var humanReadableError: String {
+        error.replacingOccurrences(of: "_", with: " ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.yellow)
+            Text("HDMI signal error detected.")
+                .font(.title3.bold())
+            VStack(alignment: .leading, spacing: 6) {
+                bullet("A loose or faulty HDMI connection")
+                bullet("Incompatible resolution or refresh rate settings")
+                bullet("The connected computer is powered off or asleep")
+                bullet("Issues with the source device's HDMI output")
+            }
+            .font(.callout)
+            Text(verbatim: "Reported state: \(humanReadableError)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+        }
+        .padding(28)
+        .frame(maxWidth: 460, alignment: .leading)
+        .background(
+            Color(NSColor.windowBackgroundColor),
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .shadow(radius: 16)
+    }
+
+    private func bullet(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("•")
+            Text(text)
+        }
     }
 }
 

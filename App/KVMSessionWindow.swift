@@ -114,7 +114,13 @@ struct KVMSessionWindow: View {
             // overlay until the renderer reports a non-zero video
             // size (markFirstFrameReceived); otherwise the user sees
             // a blank black window for a beat.
-            return !session.hasReceivedFirstFrame
+            if session.hasReceivedFirstFrame { return false }
+            // Exception: the device is already telling us it has no
+            // HDMI signal (e.g. host machine powered off). Frames
+            // won't arrive — drop the spinner so the no-signal
+            // placeholder in KVMWindowView shows instead.
+            if let err = session.videoState?.error, !err.isEmpty { return false }
+            return true
         case .reconnecting, .kicked:
             return false
         }

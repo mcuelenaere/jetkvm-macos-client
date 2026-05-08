@@ -138,23 +138,6 @@ public actor JSONRPCClient {
         }
     }
 
-    /// Convenience wrapper around `call<R>()` for methods that don't
-    /// return a useful payload. Uses `VoidValue` as the type
-    /// parameter so the caller doesn't have to write the `let _:
-    /// VoidValue = ...` dance.
-    ///
-    /// Why not a real JSON-RPC 2.0 notification (no `id`)? Per spec
-    /// notifications are unconfirmable: the server cannot signal
-    /// errors back, including `"Method not found"`. We want to see
-    /// those (e.g. the device is running firmware without a method
-    /// we use), so we keep the request / response round-trip.
-    public func callVoid(
-        method: String,
-        params: some Encodable & Sendable = EmptyParams()
-    ) async throws {
-        let _: VoidValue = try await call(method: method, params: params)
-    }
-
     /// Called by the rpc channel handler for each incoming text frame.
     /// Synchronously dispatches to a pending continuation (response)
     /// or yields to the notifications stream.

@@ -159,11 +159,16 @@ extension Session {
         return try await rpc.call(method: method, params: params)
     }
 
+    /// Convenience for void-result methods. Same plumbing as
+    /// `rpcCall`, but uses `VoidValue` so the caller doesn't have to
+    /// type-annotate the throwaway result. JSONRPCClient.call's
+    /// short-circuit handles JetKVM responses that omit the `result`
+    /// key entirely (which is what void methods return).
     private func rpcCallVoid(
         method: String,
         params: some Encodable & Sendable = EmptyParams()
     ) async throws {
         guard let rpc, rpcReady else { throw SessionError.rpcNotReady }
-        try await rpc.callVoid(method: method, params: params)
+        let _: VoidValue = try await rpc.call(method: method, params: params)
     }
 }

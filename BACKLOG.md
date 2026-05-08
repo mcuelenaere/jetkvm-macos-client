@@ -132,6 +132,17 @@ JSON = noticeable. The same `gadget.AbsMouseWheelReport` /
 `RelMouseWheelReport` call sits at the bottom either way; the win is
 purely transport overhead (binary opcode is 2 bytes total, no JSON).
 
+**Symptom is trackpad-specific.** A real scroll wheel feels fine —
+it fires at human rate (~5-10 detents/sec), 1 tick per detent. The
+chunkiness shows up on trackpad where NSEvent.scrollWheel fires at
+60-120Hz, and the per-event JSON-RPC overhead piles up into bursty
+arrivals on the host. So fixes can target trackpad specifically:
+either the binary opcode (this entry), or trackpad-side
+throttling/coalescing in `KVMVideoView.scrollWheel` (cheaper, but
+treats the symptom). TigerVNC + their VNC server fork doesn't
+exhibit this even with the same `rpcWheelReport` path because RFB
+→ in-process call has no per-tick parsing overhead.
+
 **Where (server):** `internal/hidrpc/hidrpc.go` defines
 `TypeWheelReport = 0x04`; the handler is missing in `hidrpc.go`'s
 `handleHidRPCMessage` switch. Suggested patch (already prototyped in

@@ -20,16 +20,20 @@ struct HostsView: View {
                 emptyState
             } else {
                 List(store.hosts, selection: $selection) { host in
-                    HostRow(host: host, onConnect: { connect(host) })
-                        .tag(host.id)
-                        .contextMenu {
-                            Button("Connect") { connect(host) }
-                            Button("Edit…") { editing = host }
-                            Divider()
-                            Button("Delete", role: .destructive) {
-                                store.delete(id: host.id)
-                            }
+                    HostRow(
+                        host: host,
+                        isSelected: selection == host.id,
+                        onConnect: { connect(host) },
+                        onEdit: { editing = host },
+                        onDelete: { store.delete(id: host.id) }
+                    )
+                    .tag(host.id)
+                    .contextMenu {
+                        Button("Edit…") { editing = host }
+                        Button("Delete", role: .destructive) {
+                            store.delete(id: host.id)
                         }
+                    }
                 }
                 .listStyle(.inset)
                 // Enter on the selected row connects. Double-clicking
@@ -50,32 +54,13 @@ struct HostsView: View {
         .frame(minWidth: 480, minHeight: 360)
         .navigationTitle("JetKVM")
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     showingAdd = true
                 } label: {
                     Label("Add Host", systemImage: "plus")
                 }
                 .help("Add a new host.")
-                Button {
-                    if let id = selection, let host = store.find(id: id) {
-                        editing = host
-                    }
-                } label: {
-                    Label("Edit", systemImage: "pencil")
-                }
-                .disabled(selection == nil)
-                .help("Edit the selected host.")
-                Button(role: .destructive) {
-                    if let id = selection {
-                        store.delete(id: id)
-                        selection = nil
-                    }
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-                .disabled(selection == nil)
-                .help("Delete the selected host.")
             }
         }
         .sheet(isPresented: $showingAdd) {
@@ -120,7 +105,10 @@ struct HostsView: View {
 
 private struct HostRow: View {
     let host: SavedHost
+    let isSelected: Bool
     let onConnect: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -136,14 +124,41 @@ private struct HostRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            // Edit + Delete reveal next to the play button only on
+            // the selected row. SwiftUI's `.animation(_:value:)` works
+            // natively for in-body views (unlike toolbar items), so the
+            // fade-in is smooth without any state-mirroring tricks.
+            if isSelected {
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .help("Edit \(host.displayName)")
+                .transition(.opacity.combined(with: .scale(scale: 0.7)))
+
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .help("Delete \(host.displayName)")
+                .transition(.opacity.combined(with: .scale(scale: 0.7)))
+            }
             Button(action: onConnect) {
                 Image(systemName: "play.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(.tint)
+                    // White on selection blue, .tint on regular rows —
+                    // matches the Finder / Mail "icons invert with the
+                    // selection background" convention.
+                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
             }
             .buttonStyle(.plain)
             .help("Connect to \(host.displayName)")
         }
         .padding(.vertical, 4)
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
     }
 }

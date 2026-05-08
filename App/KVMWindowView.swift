@@ -348,6 +348,11 @@ private struct KVMVideoRepresentable: NSViewRepresentable {
         nsView.setSession(session)
         nsView.pointerLocked = pointerLocked
         nsView.attach(track: track)
+        // SwiftUI re-runs updateNSView whenever observed Session
+        // state changes. Tell the NSView to reconsider its
+        // cursor-rect hide condition (videoState.error may have
+        // appeared/cleared).
+        nsView.refreshCursorRects()
     }
 
     static func dismantleNSView(_ nsView: KVMVideoView, coordinator: ()) {

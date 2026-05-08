@@ -31,6 +31,19 @@ final class KVMVideoView: NSView {
     /// PointerReport opcode 0x03).
     var pointerLocked: Bool = false
 
+    /// Cursor used inside `videoContentRect` while video is actually
+    /// flowing — a 1×1 fully-transparent image. Avoids the
+    /// double-cursor look (our local cursor + the host's cursor
+    /// rendered into the video stream). Static so we build it once.
+    private static let invisibleCursor: NSCursor = {
+        let image = NSImage(size: NSSize(width: 1, height: 1))
+        image.lockFocus()
+        NSColor.clear.setFill()
+        NSRect(x: 0, y: 0, width: 1, height: 1).fill()
+        image.unlockFocus()
+        return NSCursor(image: image, hotSpot: .zero)
+    }()
+
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
@@ -279,6 +292,35 @@ final class KVMVideoView: NSView {
         }
     }
 
+    /// Hide the cursor only while video is actively flowing — not
+    /// while we're staring at the no-signal placeholder, where the
+    /// user needs to read text and interact with the card.
+    private var shouldHideCursorOverVideo: Bool {
+        guard currentTrack != nil else { return false }
+        if let err = session?.videoState?.error, !err.isEmpty { return false }
+        return true
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        guard shouldHideCursorOverVideo else { return }
+        // Limit the invisible-cursor rect to the actual rendered
+        // video sub-rect. Letterbox/pillarbox bands keep the normal
+        // cursor so the user can see they're outside the stream.
+        let rect = videoContentRect
+        if rect.width > 0, rect.height > 0 {
+            addCursorRect(rect, cursor: Self.invisibleCursor)
+        }
+    }
+
+    /// Called from KVMVideoRepresentable.updateNSView when state that
+    /// affects shouldHideCursorOverVideo may have changed (track
+    /// attached/detached, video error appeared/cleared). AppKit will
+    /// re-call resetCursorRects on the next opportunity.
+    func refreshCursorRects() {
+        window?.invalidateCursorRects(for: self)
+    }
+
     /// View-local coordinates → 0..32767 normalized over the actual
     /// rendered video sub-rect.
     ///
@@ -312,6 +354,9 @@ extension KVMVideoView: RTCVideoViewDelegate {
         if size.width > 0, size.height > 0 {
             session?.markFirstFrameReceived()
         }
+        // The invisible-cursor rect is tied to videoContentRect,
+        // which depends on videoSize — refresh when size changes.
+        defer { window?.invalidateCursorRects(for: self) }
         let previousAspect: CGFloat = (videoSize.height > 0)
             ? videoSize.width / videoSize.height
             : 0

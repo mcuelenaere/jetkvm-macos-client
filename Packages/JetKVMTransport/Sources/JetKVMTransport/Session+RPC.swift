@@ -21,7 +21,7 @@ extension Session {
 
     public func setATXPowerAction(_ action: ATXPowerAction) async throws {
         struct Params: Encodable, Sendable { let action: String }
-        try await rpcNotify(method: "setATXPowerAction", params: Params(action: action.rawValue))
+        try await rpcCallVoid(method: "setATXPowerAction", params: Params(action: action.rawValue))
     }
 
     public func getATXState() async throws -> ATXState {
@@ -36,7 +36,7 @@ extension Session {
 
     public func setVideoCodecPreference(_ codec: VideoCodecPreference) async throws {
         struct Params: Encodable, Sendable { let codec: String }
-        try await rpcNotify(method: "setVideoCodecPreference", params: Params(codec: codec.rawValue))
+        try await rpcCallVoid(method: "setVideoCodecPreference", params: Params(codec: codec.rawValue))
     }
 
     // MARK: - Stream quality
@@ -47,7 +47,7 @@ extension Session {
 
     public func setStreamQualityFactor(_ factor: Double) async throws {
         struct Params: Encodable, Sendable { let factor: Double }
-        try await rpcNotify(method: "setStreamQualityFactor", params: Params(factor: factor))
+        try await rpcCallVoid(method: "setStreamQualityFactor", params: Params(factor: factor))
     }
 
     // MARK: - Pause / resume video stream
@@ -59,11 +59,11 @@ extension Session {
     // frames. Both calls are idempotent server-side.
 
     public func pauseVideoRPC() async throws {
-        try await rpcNotify(method: "pauseVideo")
+        try await rpcCallVoid(method: "pauseVideo")
     }
 
     public func resumeVideoRPC() async throws {
-        try await rpcNotify(method: "resumeVideo")
+        try await rpcCallVoid(method: "resumeVideo")
     }
 
     // MARK: - Scroll wheel
@@ -79,7 +79,7 @@ extension Session {
             let wheelY: Int8
             let wheelX: Int8
         }
-        try await rpcNotify(method: "wheelReport", params: Params(wheelY: wheelY, wheelX: wheelX))
+        try await rpcCallVoid(method: "wheelReport", params: Params(wheelY: wheelY, wheelX: wheelX))
     }
 
     // MARK: - State
@@ -159,11 +159,11 @@ extension Session {
         return try await rpc.call(method: method, params: params)
     }
 
-    private func rpcNotify(
+    private func rpcCallVoid(
         method: String,
         params: some Encodable & Sendable = EmptyParams()
     ) async throws {
         guard let rpc, rpcReady else { throw SessionError.rpcNotReady }
-        try await rpc.notify(method: method, params: params)
+        try await rpc.callVoid(method: method, params: params)
     }
 }

@@ -140,7 +140,9 @@ public actor JSONRPCClient {
     /// when a setter was rejected (e.g. the device is running
     /// firmware without a method we use), so we keep the request /
     /// response round-trip and just skip the success-payload decode.
-    public func notify(
+    /// Used to be called `notify()`; renamed because despite the
+    /// name it never sent a JSON-RPC notification.
+    public func callVoid(
         method: String,
         params: some Encodable & Sendable = EmptyParams()
     ) async throws {

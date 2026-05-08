@@ -40,5 +40,15 @@
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
+    <!--
+        Don't save window state on quit. macOS's "Reopen windows on
+        logon" path was reopening empty session windows because
+        SwiftUI's WindowGroup(for: Codable) auto-restores per-value
+        bindings. With this set to false, AppKit doesn't persist any
+        window state, so there's nothing to restore — the app always
+        launches fresh into HostsView.
+    -->
+    <key>NSQuitAlwaysKeepsWindows</key>
+    <false/>
 </dict>
 </plist>

@@ -30,6 +30,18 @@ struct ConnectionStatusView: View {
         if case .failed(let msg) = session.state { return msg } else { return nil }
     }
 
+    /// True between ICE-connected and the first remote video track
+    /// arriving. KVMSessionWindow keeps the overlay visible across
+    /// this gap so we own the "video is on its way" affordance here.
+    private var isAwaitingVideo: Bool {
+        if case .connected = session.state, session.videoTrack == nil { return true }
+        return false
+    }
+
+    private var showSpinner: Bool {
+        connectingPhase != nil || isAwaitingVideo
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -43,7 +55,7 @@ struct ConnectionStatusView: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
-                if connectingPhase != nil {
+                if showSpinner {
                     ProgressView().controlSize(.small)
                 }
                 Text(host.displayName)
@@ -57,6 +69,10 @@ struct ConnectionStatusView: View {
 
             if let phase = connectingPhase {
                 Text(phase.label)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else if isAwaitingVideo {
+                Text("Receiving video stream…")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else if isAwaitingPassword {

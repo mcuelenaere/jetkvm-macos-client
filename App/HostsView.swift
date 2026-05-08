@@ -20,10 +20,17 @@ struct HostsView: View {
                 emptyState
             } else {
                 List(store.hosts, selection: $selection) { host in
-                    HostRow(host: host)
+                    HostRow(host: host, onConnect: { connect(host) })
                         .tag(host.id)
                         .contentShape(Rectangle())
-                        .onTapGesture(count: 2) { connect(host) }
+                        // simultaneousGesture lets the List's native
+                        // selection (single-click via NSTableView)
+                        // still happen while we also catch the
+                        // double-click. A plain `.onTapGesture(count:
+                        // 2)` would intercept clicks before selection.
+                        .simultaneousGesture(
+                            TapGesture(count: 2).onEnded { connect(host) }
+                        )
                         .contextMenu {
                             Button("Connect") { connect(host) }
                             Button("Edit…") { editing = host }
@@ -39,13 +46,32 @@ struct HostsView: View {
         .frame(minWidth: 480, minHeight: 360)
         .navigationTitle("JetKVM")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     showingAdd = true
                 } label: {
                     Label("Add Host", systemImage: "plus")
                 }
                 .help("Add a new host.")
+                Button {
+                    if let id = selection, let host = store.find(id: id) {
+                        editing = host
+                    }
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .disabled(selection == nil)
+                .help("Edit the selected host.")
+                Button(role: .destructive) {
+                    if let id = selection {
+                        store.delete(id: id)
+                        selection = nil
+                    }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .disabled(selection == nil)
+                .help("Delete the selected host.")
             }
         }
         .sheet(isPresented: $showingAdd) {
@@ -90,6 +116,7 @@ struct HostsView: View {
 
 private struct HostRow: View {
     let host: SavedHost
+    let onConnect: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -105,6 +132,13 @@ private struct HostRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button(action: onConnect) {
+                Image(systemName: "play.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.tint)
+            }
+            .buttonStyle(.plain)
+            .help("Connect to \(host.displayName)")
         }
         .padding(.vertical, 4)
     }

@@ -67,7 +67,13 @@ struct KVMSessionWindow: View {
         switch session.state {
         case .idle, .connecting, .awaitingPassword, .failed:
             return true
-        case .connected, .reconnecting, .kicked:
+        case .connected:
+            // ICE is up but the video track may take a beat to land
+            // — keep the overlay so the spinner stays visible across
+            // that gap (otherwise the user sees a blank black window
+            // for a second).
+            return session.videoTrack == nil
+        case .reconnecting, .kicked:
             return false
         }
     }

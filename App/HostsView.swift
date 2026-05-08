@@ -133,6 +133,7 @@ private struct HostRow: View {
     let onConnect: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
+    @State private var isHovering = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -171,18 +172,27 @@ private struct HostRow: View {
                 .help("Delete \(host.displayName)")
                 .transition(.opacity.combined(with: .scale(scale: 0.7)))
             }
-            Button(action: onConnect) {
-                Image(systemName: "play.circle.fill")
-                    .font(.title2)
-                    // White on selection blue, .tint on regular rows —
-                    // matches the Finder / Mail "icons invert with the
-                    // selection background" convention.
-                    .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+            // Play button only appears on hover or while the row is
+            // selected — keeps the resting list visually quieter.
+            if isHovering || isSelected {
+                Button(action: onConnect) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title2)
+                        // White on selection blue, .tint on regular
+                        // rows — matches the Finder / Mail "icons
+                        // invert with the selection background"
+                        // convention.
+                        .foregroundStyle(isSelected ? Color.white : Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help("Connect to \(host.displayName)")
+                .transition(.opacity)
             }
-            .buttonStyle(.plain)
-            .help("Connect to \(host.displayName)")
         }
         .padding(.vertical, 4)
-        .animation(.easeInOut(duration: 0.18), value: isSelected)
+        .contentShape(Rectangle())  // make the whole row hover-targetable
+        .onHover { isHovering = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
+        .animation(.easeInOut(duration: 0.12), value: isHovering)
     }
 }

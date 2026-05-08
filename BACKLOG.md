@@ -122,53 +122,106 @@ presentation options while in fullscreen.
 
 ---
 
-## Scroll wheel support (requires upstream JetKVM change)
+## Promote scroll wheel to binary HID-RPC (requires upstream JetKVM change)
 
-**Where (client):** `App/KVMVideoView.swift` would override
-`scrollWheel(with: NSEvent)` and forward to a new
-`Session.sendScroll(deltaY:)` that emits a HID-RPC wheel frame on
-the unreliable-ordered channel.
-`Packages/JetKVMProtocol/Sources/JetKVMProtocol/Codec/HIDRPCMessage.swift`
-intentionally omits a `wheelReport` case today — that comment is the
-thing to update once the wire format is settled.
+**Status:** scroll currently goes through JSON-RPC's `wheelReport` method
+(see `Session.sendWheelReport` and `Session+RPC.sendWheelReportRPC`).
+That works but feels chunky over WebRTC because of per-event JSON
+encode/parse overhead — 60+ ticks/sec on a trackpad gesture * ~80 bytes
+JSON = noticeable. The same `gadget.AbsMouseWheelReport` /
+`RelMouseWheelReport` call sits at the bottom either way; the win is
+purely transport overhead (binary opcode is 2 bytes total, no JSON).
 
 **Where (server):** `internal/hidrpc/hidrpc.go` defines
-`TypeWheelReport = 0x04` but no handler exists anywhere in the
-JetKVM tree. The TS UI also never sends one
-(`ui/src/hooks/hidRpc.ts` declares the constant with no encoder).
-Adding support, in roughly the right order:
+`TypeWheelReport = 0x04`; the handler is missing in `hidrpc.go`'s
+`handleHidRPCMessage` switch. Suggested patch (already prototyped in
+the `claude/keen-matsumoto-e7e340` worktree of the JetKVM repo):
 
-1. **Define the wire format.** A single signed byte is sufficient
-   for HID boot-mouse semantics — vertical wheel only, in HID
-   "click" units (positive = scroll up). Concretely:
-   `WheelReport: [deltaY: i8]`, payload size 1.
-2. **Decoder.** `internal/hidrpc/message.go`: add a
-   `WheelReport()` accessor returning `(deltaY int8, err)` with
-   the same length-strict pattern the existing `MouseReport()`
-   uses.
-3. **Dispatch.** `hidrpc.go` (root): add a case for
-   `TypeWheelReport` in `handleHidRPCMessage` that decodes and
-   forwards to the gadget driver.
-4. **Gadget driver.** `internal/usbgadget/`: most boot-mouse HID
-   descriptors already include 1 byte of wheel delta after the 2
-   dx/dy bytes — verify the JetKVM gadget descriptor does, then
-   add a `MouseWheel(delta int8)` (or extend `MouseReport`) that
-   writes a HID report with non-zero wheel and zero motion. If the
-   descriptor doesn't already include the wheel field, that's a
-   second sub-task: extend the descriptor and bump any version
-   string the host driver might cache.
+1. **Wire format.** One signed byte: `[deltaY: i8]`. Vertical only —
+   horizontal wheel events are rare on a KVM use case.
+2. **Decoder** in `internal/hidrpc/message.go`: a `WheelReport()`
+   accessor returning `(deltaY int8, err)`, same length-strict pattern
+   as `MouseReport()`.
+3. **Dispatch** in `hidrpc.go`: case for `TypeWheelReport` that
+   decodes and calls `rpcWheelReport(wheel.DeltaY, 0)` — the existing
+   in-process JSON-RPC handler.
+4. **No gadget changes needed.** The HID descriptor already supports
+   wheel deltas (verified via the working JSON-RPC path).
 
-**Compatibility note.** Existing browser UI and clients don't send
-`WheelReport` at all, so adding server-side support is purely
-additive — old clients keep working, new clients gain scroll. No
-versioning gymnastics needed.
+**Compatibility:** purely additive. Old clients (browser UI, our
+JSON-RPC client) keep working; new clients gain a faster path.
 
-**Client-side coalescing.** When this lands, the macOS client's
-`scrollWheel` handler should accumulate `NSEvent.scrollingDeltaY`
-(fractional points) into integer wheel ticks before sending — at
-the native NSEvent rate, scroll generates dozens of fractional
-samples per "tick" and we'd flood the gadget if we sent one HID
-report per sample.
+**Client-side migration when this lands:**
+
+1. `Packages/JetKVMProtocol/Sources/JetKVMProtocol/Codec/HIDRPCMessage.swift` —
+   add a `wheelReport(deltaY: Int8)` case + encoder.
+2. `Packages/JetKVMTransport/Sources/JetKVMTransport/Session.swift` —
+   `sendWheelReport(...)` switches from `sendWheelReportRPC` to
+   `webrtc.sendHID(.wheelReport(deltaY:), on: .unreliableOrdered)`.
+   Remove the `Session+RPC.sendWheelReportRPC` method.
+3. `App/KVMVideoView.swift` — drop the X axis from the API surface
+   (binary protocol is Y-only), simplify the accumulator if needed.
+
+**Tuning if it's still not as smooth as VNC's in-process scroll:**
+the bottleneck after binary HID-RPC will be the WebRTC SCTP path
+itself. Coalescing multiple NSEvent.scrollWheel events into one
+wheel report (e.g., 16ms throttle with summed deltas) can cut the
+event count further; the JetKVM web frontend already does this
+via its `scrollThrottling` setting. But that's only worth doing
+after measuring; binary HID-RPC alone may be fast enough.
+
+---
+
+## Pause/resume video for bandwidth savings (requires upstream JetKVM change)
+
+**Status:** intended to save bandwidth by stopping the video stream
+when the KVM window is minimized or fully occluded. Two approaches
+were considered:
+
+1. **WebRTC renegotiation** to direction `.inactive` — canonical, but
+   needs a new `"renegotiate"` signaling message type + state-machine
+   handling on both sides since the existing `"offer"` path means
+   "start a new session, kick the old one" (`handleWebRTCSession` in
+   `web.go`). ~50-80 LOC across server + client.
+2. **Pause/resume JSON-RPC method** — much simpler. Server stops
+   feeding the encoder (or drops frames before pion's track buffer)
+   when paused. ~20 LOC server-side, ~10 LOC client-side. Bandwidth
+   savings are effectively identical — RTP video is ~99% of the
+   stream; STUN/RTCP keepalives are negligible.
+
+**Going with #2.** The renegotiation approach was abandoned because
+the simplicity wins out and there's no observable difference in
+saved bandwidth.
+
+**Server-side outline:**
+
+1. New JSON-RPC methods `pauseVideo()` and `resumeVideo()` in
+   `jsonrpc.go`. Notifies (no return value).
+2. They flip a session-scoped boolean (e.g. `session.videoPaused`).
+3. The video-feed loop checks the flag before pushing a frame to
+   the pion track. When paused, the loop skips frames (or sleeps
+   until resumed).
+4. On resume, force a keyframe so the client doesn't render a
+   stale-and-recovering picture for the first few frames.
+
+**Client-side outline:**
+
+1. `Session+RPC.swift` — add `pauseVideo()` / `resumeVideo()`
+   notify wrappers.
+2. `Session.swift` — public `pauseVideo()` / `resumeVideo()` that
+   gate on `rpcReady` and fire the notify.
+3. `KVMSessionWindow` (or a new `BandwidthGate`) — observe
+   `NSWindow.didMiniaturizeNotification`,
+   `NSWindow.didDeminiaturizeNotification`, and
+   `didChangeOcclusionStateNotification`. Debounce ~5s before
+   pause (so a quick alt-tab doesn't trigger), fire resume
+   immediately on show.
+
+**Fallback if upstream takes a while:** `session.disconnect()` on
+hide debounce, full `session.connect()` on restore. ~2-3s reconnect
+cost on show but zero bandwidth while hidden. Reuses existing
+infrastructure (Keychain auto-fill, exponential-backoff reconnect
+logic in Session.swift).
 
 ---
 

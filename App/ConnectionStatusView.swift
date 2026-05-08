@@ -97,7 +97,7 @@ struct ConnectionStatusView: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { onCancel() }
+                Button("Cancel", role: .cancel) { onCancel() }
                 if failureMessage != nil {
                     Button("Retry") { onRetry() }
                         .keyboardShortcut(.defaultAction)

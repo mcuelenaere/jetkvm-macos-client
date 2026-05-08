@@ -30,23 +30,6 @@ private struct ResultEnvelope<R: Decodable>: Decodable {
     let result: R
 }
 
-/// Outgoing JSON-RPC 2.0 notification (no `id` — distinct from the
-/// `JSONRPCRequest` shape in the protocol package). Encodes to
-/// `{"jsonrpc":"2.0","method":...,"params":...}`. Internal to the
-/// transport since the protocol package only defines incoming
-/// notifications.
-private struct JSONRPCNotificationOut<P: Encodable>: Encodable {
-    let jsonrpc: String
-    let method: String
-    let params: P
-
-    init(method: String, params: P) {
-        self.jsonrpc = "2.0"
-        self.method = method
-        self.params = params
-    }
-}
-
 private struct IncomingEnvelope: Decodable {
     let id: Int?
     let method: String?
@@ -147,35 +130,61 @@ public actor JSONRPCClient {
         }
     }
 
-    /// Send a JSON-RPC 2.0 *notification* — no `id`, no expected
-    /// response. Per spec the server doesn't reply; if it does (some
-    /// servers do for void methods), the response has no `id` we
-    /// match against and `handle()` silently drops it.
+    /// Send a request and await the response, but only decode the
+    /// header (id + error). The body's `result` field — which JetKVM
+    /// omits entirely for void methods — is ignored.
     ///
-    /// This used to be implemented as `call()` with `VoidValue`, but
-    /// JetKVM's response for void methods is `{"jsonrpc":"2.0",
-    /// "id":N}` with no `result` key, so `ResultEnvelope<VoidValue>`
-    /// would fail decode with "Key 'result' not found." A real
-    /// notification side-steps the round-trip entirely.
+    /// Why not a real JSON-RPC 2.0 notification (no `id`)? Per spec
+    /// notifications are unconfirmable: the server cannot signal
+    /// errors back, including `"Method not found"`. We want to know
+    /// when a setter was rejected (e.g. the device is running
+    /// firmware without a method we use), so we keep the request /
+    /// response round-trip and just skip the success-payload decode.
     public func notify(
         method: String,
         params: some Encodable & Sendable = EmptyParams()
     ) async throws {
-        let notification = JSONRPCNotificationOut(method: method, params: params)
-        let frameData: Data
+        let id = nextID
+        nextID += 1
+
+        let request = JSONRPCRequest(method: method, params: params, id: id)
+        let requestData: Data
         do {
-            frameData = try encoder.encode(notification)
+            requestData = try encoder.encode(request)
         } catch {
             throw JSONRPCClientError.encoding(String(describing: error))
         }
-        guard let frame = String(data: frameData, encoding: .utf8) else {
+        guard let frame = String(data: requestData, encoding: .utf8) else {
             throw JSONRPCClientError.encoding("UTF-8 round-trip failed")
         }
-        let ok = await send(frame)
-        if !ok {
-            log.error("rpc notify send failed for \(method, privacy: .public)")
-            throw JSONRPCClientError.sendFailed
+
+        let responseData: Data = try await withCheckedThrowingContinuation { continuation in
+            pending[id] = continuation
+            Task { [send] in
+                let ok = await send(frame)
+                if !ok {
+                    log.error("rpc send failed for \(method, privacy: .public) id=\(id, privacy: .public)")
+                    if let pending = await self.takePending(id) {
+                        pending.resume(throwing: JSONRPCClientError.sendFailed)
+                    }
+                }
+            }
         }
+
+        let header: ResponseHeader
+        do {
+            header = try decoder.decode(ResponseHeader.self, from: responseData)
+        } catch {
+            log.error("rpc response header decode failed for \(method, privacy: .public) id=\(id, privacy: .public): \(String(describing: error), privacy: .public)")
+            throw JSONRPCClientError.malformedResponse(String(describing: error))
+        }
+        if let serverError = header.error {
+            log.notice("rpc server error for \(method, privacy: .public) id=\(id, privacy: .public): \(serverError.code, privacy: .public) \(serverError.message, privacy: .public)")
+            throw JSONRPCClientError.server(serverError)
+        }
+        // Success: the response may contain `"result": null`,
+        // `"result": <something>`, or no result key at all
+        // (JetKVM's void methods). We don't care which.
     }
 
     /// Called by the rpc channel handler for each incoming text frame.

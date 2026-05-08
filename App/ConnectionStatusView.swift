@@ -49,7 +49,16 @@ struct ConnectionStatusView: View {
             Color.black.ignoresSafeArea()
             card
                 .padding(28)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                // Solid background instead of `.thinMaterial`: macOS
+                // materials apply vibrancy to overlaid text, which
+                // desaturates colored content (red error text gets
+                // washed out into the backdrop) — readability beats
+                // the slightly nicer translucent look here.
+                .background(
+                    Color(NSColor.windowBackgroundColor),
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+                .shadow(radius: 16)
                 .frame(minWidth: 360, idealWidth: 420, maxWidth: 460)
         }
     }

@@ -45,8 +45,19 @@ struct KVMSessionWindowID: Hashable, Codable {
     }
 }
 
+/// Bridges SwiftUI's App lifecycle to a small NSApplicationDelegate
+/// — only used to opt into "quit when the last window closes."
+/// Default macOS behavior keeps the process running with no
+/// windows; for a session-oriented client that's the wrong default.
+private final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+}
+
 @main
 struct JetKVMClientApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var hostStore = HostStore()
     @State private var discovery = DeviceDiscovery()
 

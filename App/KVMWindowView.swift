@@ -18,7 +18,14 @@ struct KVMWindowView: View {
 
     private var keyboardCaptureBinding: Binding<Bool> {
         Binding(
-            get: { capturer.userIntent },
+            // Only show as checked when capture is actually doing
+            // something — `userIntent` alone goes true even when
+            // accessibility was denied, which leaves the menu showing
+            // a misleading checkmark next to a blocked feature. Both
+            // .enabled and .suspended are "yes, this will be on as soon
+            // as conditions allow"; .awaitingAccessibility / .failed /
+            // .disabled aren't.
+            get: { capturer.state == .enabled || capturer.state == .suspended },
             set: { newValue in
                 if newValue { capturer.enable() } else { capturer.disable() }
             }

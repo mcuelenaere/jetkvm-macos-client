@@ -74,13 +74,19 @@ final class KeyboardCapturer {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var notificationObservers: [NSObjectProtocol] = []
+    /// The window the user enabled capture in. The tap stays globally
+    /// installed (it must be — CGEventTap is session-level), but it
+    /// only swallows + forwards keys while this window is the key
+    /// window of our app. With multiple KVM windows open this is what
+    /// keeps a window-A capture from eating keys aimed at window B.
+    private weak var boundWindow: NSWindow?
 
     init() {
         // Watch for app focus changes so we can suspend/resume the
-        // tap automatically. NSApp-level (not NSWindow-level) is
-        // appropriate — CGEventTap is global, so when our app isn't
-        // frontmost we shouldn't be intercepting system shortcuts at
-        // all.
+        // tap automatically. NSApp-level catches the case where the
+        // user switches to a different app entirely; the per-window
+        // observers below catch in-app focus changes between KVM
+        // session windows.
         let center = NotificationCenter.default
         notificationObservers.append(center.addObserver(
             forName: NSApplication.didResignActiveNotification,
@@ -95,6 +101,23 @@ final class KeyboardCapturer {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.appBecameActive() }
+        })
+        // Per-window key-status: filter by `boundWindow` in the handler
+        // (registering with object: nil and comparing inside is simpler
+        // than re-registering on every boundWindow change).
+        notificationObservers.append(center.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            MainActor.assumeIsolated { self?.windowBecameKey(note.object as? NSWindow) }
+        })
+        notificationObservers.append(center.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            MainActor.assumeIsolated { self?.windowResignedKey(note.object as? NSWindow) }
         })
     }
 
@@ -119,6 +142,10 @@ final class KeyboardCapturer {
     func enable() {
         log.info("user enabled capture")
         userIntent = true
+        // Remember which window the user toggled this in — we'll
+        // gate event-swallowing on this window being key, so a
+        // capture in window A doesn't steal keys aimed at window B.
+        boundWindow = NSApp.keyWindow
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let options: [String: Bool] = [promptKey: true]
         guard AXIsProcessTrustedWithOptions(options as CFDictionary) else {
@@ -186,6 +213,19 @@ final class KeyboardCapturer {
             return
         }
         installTap()
+    }
+
+    private func windowResignedKey(_ window: NSWindow?) {
+        // Only react to the window the user enabled capture in. Other
+        // windows of our app coming and going don't matter to this
+        // capturer instance.
+        guard let window, window === boundWindow else { return }
+        appResignedActive()
+    }
+
+    private func windowBecameKey(_ window: NSWindow?) {
+        guard let window, window === boundWindow else { return }
+        appBecameActive()
     }
 
     private func installTap() {

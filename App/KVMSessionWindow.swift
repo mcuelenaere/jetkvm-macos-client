@@ -74,6 +74,12 @@ struct KVMSessionWindow: View {
             guard let win = note.object as? NSWindow, win === ownWindow else { return }
             isFullscreen = true
             FullscreenPresentationCounter.shared.enter()
+            // Suppress the window's toolbar entirely so it doesn't
+            // slide back in when the cursor reaches the top of the
+            // screen. NSApp.presentationOptions only governs the
+            // system menu bar / dock; the window's own title-bar
+            // reveal is separate macOS behavior.
+            win.toolbar?.isVisible = false
         }
         .onReceive(NotificationCenter.default.publisher(
             for: NSWindow.didExitFullScreenNotification)
@@ -81,6 +87,7 @@ struct KVMSessionWindow: View {
             guard let win = note.object as? NSWindow, win === ownWindow else { return }
             isFullscreen = false
             FullscreenPresentationCounter.shared.exit()
+            win.toolbar?.isVisible = true
         }
     }
 

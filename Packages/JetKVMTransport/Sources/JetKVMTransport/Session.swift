@@ -35,6 +35,12 @@ public final class Session {
         case idle
         case connecting(Phase)
         case awaitingPassword(LocalDevice?)
+        /// First request to the device failed system trust evaluation
+        /// and the user hasn't opted into trusting self-signed certs
+        /// for this host. UI prompts; on accept the caller re-runs
+        /// `connect(...)` with `endpoint.allowSelfSignedCertificate ==
+        /// true` (and typically persists that choice).
+        case awaitingTrustOverride(host: String, reason: String)
         case connected
         /// Connection dropped after we'd been .connected; backing off
         /// before the next retry. `attempt` counts up across the
@@ -223,6 +229,13 @@ public final class Session {
             let offerSDP = try await webrtc.start()
             try await signaling.send(.offer(sdpBase64: offerSDP))
             state = .connecting(.awaitingAnswer)
+        } catch HTTPClientError.untrustedServerCertificate(let reason) {
+            log.notice("TLS trust failed for \(endpoint.host, privacy: .public): \(reason, privacy: .public) — awaiting user opt-in")
+            // Don't auto-retry here even if reconnectAttempt > 0 — a
+            // mid-session cert flip should still surface to the user
+            // rather than silently get backed off.
+            state = .awaitingTrustOverride(host: endpoint.host, reason: reason)
+            await teardown()
         } catch {
             log.error("connect failed: \(describe(error), privacy: .public)")
             // If this attempt was part of a reconnect cycle, bump the

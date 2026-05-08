@@ -59,6 +59,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 struct JetKVMClientApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var hostStore = HostStore()
+    @State private var trustStore = TrustedHostStore()
     @State private var discovery = DeviceDiscovery()
 
     var body: some Scene {
@@ -67,6 +68,7 @@ struct JetKVMClientApp: App {
         WindowGroup("JetKVM", id: "hosts") {
             HostsView()
                 .environment(hostStore)
+                .environment(trustStore)
                 .environment(discovery)
                 .onAppear { discovery.start() }
         }
@@ -81,6 +83,11 @@ struct JetKVMClientApp: App {
         WindowGroup("JetKVM Session", for: KVMSessionWindowID.self) { $sessionID in
             if let id = sessionID {
                 KVMSessionWindow(sessionID: id)
+                    // Per-host trust opt-ins persist via TrustedHostStore
+                    // so a "Trust certificate" click from one window
+                    // applies to every future window for the same host
+                    // (saved or mDNS-discovered).
+                    .environment(trustStore)
                     // 16:9 video at minWidth=800 wants ~525pt of
                     // video height (plus toolbar / status strip).
                     // The previous minHeight=600 floored the shrink-

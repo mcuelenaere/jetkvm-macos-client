@@ -27,6 +27,7 @@
 		FF00000000000000000000FF /* KVMSessionWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F600000000000000000000F6 /* KVMSessionWindow.swift */; };
 		1A00000000000000000000A1 /* DiscoveredHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B1 /* DiscoveredHost.swift */; };
 		1A00000000000000000000A2 /* DeviceDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B2 /* DeviceDiscovery.swift */; };
+		1A00000000000000000000A3 /* TrustedHostStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B3 /* TrustedHostStore.swift */; };
 		2A00000000000000000000A1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2A00000000000000000000B1 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
@@ -44,6 +45,7 @@
 		CC00000000000000000000CC /* HostKeyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostKeyDetector.swift; sourceTree = "<group>"; };
 		F100000000000000000000F1 /* SavedHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedHost.swift; sourceTree = "<group>"; };
 		F200000000000000000000F2 /* HostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostStore.swift; sourceTree = "<group>"; };
+		1A00000000000000000000B3 /* TrustedHostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustedHostStore.swift; sourceTree = "<group>"; };
 		F300000000000000000000F3 /* HostsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostsView.swift; sourceTree = "<group>"; };
 		F400000000000000000000F4 /* HostFormSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostFormSheet.swift; sourceTree = "<group>"; };
 		F500000000000000000000F5 /* ConnectionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusView.swift; sourceTree = "<group>"; };
@@ -86,6 +88,7 @@
 				F600000000000000000000F6 /* KVMSessionWindow.swift */,
 				F100000000000000000000F1 /* SavedHost.swift */,
 				F200000000000000000000F2 /* HostStore.swift */,
+				1A00000000000000000000B3 /* TrustedHostStore.swift */,
 				1A00000000000000000000B1 /* DiscoveredHost.swift */,
 				1A00000000000000000000B2 /* DeviceDiscovery.swift */,
 				2A00000000000000000000B1 /* Localizable.xcstrings */,
@@ -200,6 +203,7 @@
 				D100000000000000000000D1 /* JetKVMClientApp.swift in Sources */,
 				FA00000000000000000000FA /* SavedHost.swift in Sources */,
 				FB00000000000000000000FB /* HostStore.swift in Sources */,
+				1A00000000000000000000A3 /* TrustedHostStore.swift in Sources */,
 				FC00000000000000000000FC /* HostsView.swift in Sources */,
 				FD00000000000000000000FD /* HostFormSheet.swift in Sources */,
 				FE00000000000000000000FE /* ConnectionStatusView.swift in Sources */,

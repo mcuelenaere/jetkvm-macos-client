@@ -16,6 +16,11 @@ public enum HTTPClientError: Error, Sendable, Equatable {
     case invalidResponse
     case decoding(String)
     case transport(String)
+    /// TLS handshake completed but the server's certificate didn't
+    /// pass the system trust store and the user hasn't opted into
+    /// trusting it. The reason carries the system-localized message
+    /// (e.g. "certificate is not trusted") for display.
+    case untrustedServerCertificate(reason: String)
 }
 
 /// HTTP client for JetKVM's REST endpoints.
@@ -147,8 +152,35 @@ public final class HTTPClient: @unchecked Sendable {
     private func rawCall(_ request: URLRequest) async throws -> (Data, URLResponse) {
         do {
             return try await urlSession.data(for: request)
+        } catch let urlErr as URLError where Self.isTLSTrustError(urlErr.code) {
+            // System trust store rejected the cert chain and the user
+            // hasn't opted into trusting it (allowSelfSignedCertificate
+            // is false, or TLSDelegate fell through to default
+            // handling). Surface as a distinct error so Session can
+            // transition to .awaitingTrustOverride and the UI can
+            // prompt the user.
+            throw HTTPClientError.untrustedServerCertificate(
+                reason: urlErr.localizedDescription
+            )
         } catch {
             throw HTTPClientError.transport(String(describing: error))
+        }
+    }
+
+    /// True for the URLError codes that mean "the TLS handshake's cert
+    /// chain didn't pass system trust evaluation." We treat all of
+    /// these the same — the user opt-in we'd offer (`SecTrustSet-
+    /// Exceptions` via TLSDelegate) overrides chain-of-trust *and*
+    /// hostname *and* validity-period checks anyway.
+    private static func isTLSTrustError(_ code: URLError.Code) -> Bool {
+        switch code {
+        case .serverCertificateUntrusted,
+             .serverCertificateHasUnknownRoot,
+             .serverCertificateHasBadDate,
+             .serverCertificateNotYetValid:
+            return true
+        default:
+            return false
         }
     }
 

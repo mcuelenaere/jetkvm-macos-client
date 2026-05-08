@@ -22,6 +22,10 @@ struct ConnectionStatusView: View {
     /// Called when the user retries after a failure. Parent re-runs
     /// the connect flow with a fresh attempt.
     let onRetry: () -> Void
+    /// Called when the user accepts the TLS-trust prompt. Parent is
+    /// expected to flip `endpoint.allowSelfSignedCertificate`,
+    /// persist that choice if the host is saved, and re-run connect.
+    let onAcceptTrust: () -> Void
 
     @State private var password: String = ""
     @State private var rememberPassword: Bool = true
@@ -32,6 +36,17 @@ struct ConnectionStatusView: View {
 
     private var isAwaitingPassword: Bool {
         if case .awaitingPassword = session.state { return true } else { return false }
+    }
+
+    /// Reason string from the underlying URLError when the cert chain
+    /// didn't pass system trust. Surfaced verbatim in the prompt so
+    /// the user sees e.g. `"JetKVM Self-Signed CA" certificate is not
+    /// trusted` instead of a generic error.
+    private var trustOverrideReason: String? {
+        if case .awaitingTrustOverride(_, let reason) = session.state {
+            return reason
+        }
+        return nil
     }
 
     private var failureMessage: String? {
@@ -94,6 +109,8 @@ struct ConnectionStatusView: View {
                 Text("Receiving video stream…")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+            } else if let trustOverrideReason {
+                trustOverrideSection(reason: trustOverrideReason)
             } else if isAwaitingPassword {
                 passwordSection
             } else if let failureMessage {
@@ -117,7 +134,33 @@ struct ConnectionStatusView: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(password.isEmpty)
                 }
+                if trustOverrideReason != nil {
+                    Button("Trust certificate") { onAcceptTrust() }
+                        .keyboardShortcut(.defaultAction)
+                }
             }
+        }
+    }
+
+    /// Trust-prompt body shown when the device's TLS cert isn't in
+    /// the system trust store and we don't yet have an opt-in. The
+    /// reason string comes from URLError's localizedDescription so
+    /// the user sees the actual cert name (e.g. "JetKVM Self-Signed
+    /// CA"). Accepting persists to SavedHost via the parent so the
+    /// prompt doesn't re-fire next time.
+    private func trustOverrideSection(reason: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("This device's certificate isn't trusted by macOS.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Text(reason)
+                .font(.callout)
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("JetKVM ships with a self-signed certificate by default. Trusting it lets the connection proceed; the choice is remembered for this host.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

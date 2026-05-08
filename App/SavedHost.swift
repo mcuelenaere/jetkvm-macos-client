@@ -31,7 +31,10 @@ struct SavedHost: Codable, Identifiable, Hashable {
         name.isEmpty ? host : name
     }
 
-    /// Convenience for handing the host to Session.connect(...).
+    /// Connection params, sans TLS-trust opt-in — KVMSessionWindow
+    /// layers the latter on at connect time by querying
+    /// `TrustedHostStore` so the trust state is keyed by host string,
+    /// not by SavedHost id.
     var endpoint: DeviceEndpoint {
         DeviceEndpoint(host: host, port: port, useTLS: useTLS)
     }

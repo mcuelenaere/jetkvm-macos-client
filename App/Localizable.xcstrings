@@ -115,6 +115,9 @@
     "JetKVM Session" : {
 
     },
+    "JetKVM ships with a self-signed certificate by default. Trusting it lets the connection proceed; the choice is remembered for this host." : {
+
+    },
     "Keyboard lock" : {
 
     },
@@ -202,7 +205,13 @@
     "The connected computer is powered off or asleep" : {
 
     },
+    "This device's certificate isn't trusted by macOS." : {
+
+    },
     "This removes the saved entry. The device itself isn't affected." : {
+
+    },
+    "Trust certificate" : {
 
     },
     "v" : {

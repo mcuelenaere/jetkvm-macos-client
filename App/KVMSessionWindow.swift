@@ -27,6 +27,7 @@ struct KVMSessionWindow: View {
     /// which costs an IDR on resume).
     private static let pauseDebounce: Duration = .seconds(5)
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(TrustedHostStore.self) private var trustStore
 
     var body: some View {
         // VStack(ZStack(KVM + overlay), StatusStrip): the StatusStrip
@@ -45,9 +46,10 @@ struct KVMSessionWindow: View {
                         displayName: sessionID.displayName,
                         urlString: sessionID.urlString,
                         host: sessionID.host,
-                        endpoint: sessionID.endpoint,
+                        endpoint: currentEndpoint,
                         onCancel: { dismissWindow() },
-                        onRetry: { Task { await connect() } }
+                        onRetry: { Task { await connect() } },
+                        onAcceptTrust: { Task { await acceptTrustAndRetry() } }
                     )
                     .transition(.opacity)
                 }
@@ -143,7 +145,7 @@ struct KVMSessionWindow: View {
         // and .reconnecting render their own banner inside
         // KVMWindowView, so we suppress the overlay for those.
         switch session.state {
-        case .idle, .connecting, .awaitingPassword, .failed:
+        case .idle, .connecting, .awaitingPassword, .awaitingTrustOverride, .failed:
             return true
         case .connected:
             // ICE is up and the track is attached, but actual frames
@@ -163,9 +165,31 @@ struct KVMSessionWindow: View {
         }
     }
 
+    /// DeviceEndpoint reflecting the persisted TLS-trust opt-in for
+    /// this host. `trustStore.isTrusted` is keyed by host string so
+    /// the result is stable across window recreations and mDNS-
+    /// discovered vs. SavedHost flows.
+    private var currentEndpoint: DeviceEndpoint {
+        DeviceEndpoint(
+            host: sessionID.host,
+            port: sessionID.port,
+            useTLS: sessionID.useTLS,
+            allowSelfSignedCertificate: trustStore.isTrusted(sessionID.host)
+        )
+    }
+
     private func connect() async {
         let saved = PasswordVault.load(for: sessionID.host)
-        await session.connect(endpoint: sessionID.endpoint, password: saved)
+        await session.connect(endpoint: currentEndpoint, password: saved)
+    }
+
+    /// Called when the user clicks "Trust certificate" on the
+    /// awaitingTrustOverride card. Persists the opt-in to
+    /// TrustedHostStore (keyed by host) so every future window for
+    /// this host skips the prompt, then re-runs the connect flow.
+    private func acceptTrustAndRetry() async {
+        trustStore.trust(sessionID.host)
+        await connect()
     }
 
     /// Decide whether the encoder feed should be running based on the
@@ -202,13 +226,6 @@ struct KVMSessionWindow: View {
 }
 
 extension KVMSessionWindowID {
-    /// DeviceEndpoint built from the session id's connection fields.
-    /// Used by KVMSessionWindow.connect() and ConnectionStatusView's
-    /// password-resubmit path.
-    var endpoint: DeviceEndpoint {
-        DeviceEndpoint(host: host, port: port, useTLS: useTLS)
-    }
-
     /// Round-trippable URL string for the connect-overlay's subtitle.
     /// Drops the port suffix when it matches the scheme default.
     var urlString: String {

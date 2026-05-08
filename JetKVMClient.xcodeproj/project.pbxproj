@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -97,7 +97,6 @@
 			isa = PBXGroup;
 			children = (
 			);
-			name = Packages;
 			path = Packages;
 			sourceTree = "<group>";
 		};
@@ -164,7 +163,6 @@
 				E300000000000000000000E3 /* XCLocalSwiftPackageReference "Packages/JetKVMProtocol" */,
 				E500000000000000000000E5 /* XCLocalSwiftPackageReference "Packages/JetKVMTransport" */,
 			);
-			preferredProjectObjectVersion = 70;
 			productRefGroup = A500000000000000000000A5 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -216,7 +214,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = C45RUW4MTB;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -241,7 +239,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = C45RUW4MTB;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;

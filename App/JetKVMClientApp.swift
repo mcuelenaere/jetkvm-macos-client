@@ -61,7 +61,12 @@ struct JetKVMClientApp: App {
                 }
             }
             .environment(hostStore)
-            .frame(minWidth: 800, minHeight: 600)
+            // 16:9 video at minWidth=800 wants ~525pt of video height
+            // (plus toolbar / status strip). The previous minHeight=600
+            // floored the shrink-resize from KVMVideoView and left
+            // letterbox bars. 400 accommodates 16:9 and most 21:9
+            // ultrawide displays without going absurdly small.
+            .frame(minWidth: 800, minHeight: 400)
         }
         .defaultSize(width: 1280, height: 800)
     }

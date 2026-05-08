@@ -345,28 +345,60 @@ extension KVMVideoView {
         guard bounds.width > 0, bounds.height > 0 else { return }
         let currentAspect = bounds.width / bounds.height
         if abs(currentAspect - videoAspect) < 0.01 { return }
-        // Keep the video-area width, derive the new height from the
-        // target aspect, then fold that delta into the window frame.
-        // (Window chrome — title bar, toolbar, status strip — stays
-        // its own height; we just grow/shrink the video area.)
-        let newBoundsHeight = bounds.width / videoAspect
-        let deltaHeight = newBoundsHeight - bounds.height
+
+        // First attempt: keep video-area width, derive height from
+        // the target aspect, fold the delta into the window. Window
+        // chrome (title bar / toolbar / status strip) stays its own
+        // height; we just grow/shrink the video area.
+        let chromeWidth = max(window.frame.width - bounds.width, 0)
+        let chromeHeight = max(window.frame.height - bounds.height, 0)
+        var newBoundsHeight = bounds.width / videoAspect
+        var newBoundsWidth = bounds.width
         var newFrame = window.frame
-        newFrame.size.height += deltaHeight
-        newFrame.origin.y -= deltaHeight  // anchor top edge
-        // Clamp so we don't end up off-screen or taller than the
-        // visible area of the active screen.
+        newFrame.size.height = newBoundsHeight + chromeHeight
+        newFrame.size.width = newBoundsWidth + chromeWidth
+        // Anchor the top edge: y in macOS is bottom-up, so growing
+        // height pushes the bottom-left up to keep the title bar at
+        // the same screen y.
+        newFrame.origin.y = window.frame.maxY - newFrame.size.height
+
+        // If shrinking would violate the window's minSize, hold the
+        // height at the floor and widen instead so the video aspect
+        // still lands. Otherwise the floor would just leave us with
+        // letterbox bars.
+        let minHeight = window.minSize.height
+        if minHeight > 0, newFrame.size.height < minHeight {
+            newFrame.size.height = minHeight
+            newFrame.origin.y = window.frame.maxY - minHeight
+            newBoundsHeight = minHeight - chromeHeight
+            newBoundsWidth = newBoundsHeight * videoAspect
+            newFrame.size.width = max(newBoundsWidth + chromeWidth, window.minSize.width)
+        }
+
+        // Clamp to the active screen so we don't end up off-edge or
+        // taller/wider than the visible area.
         if let visible = window.screen?.visibleFrame {
             if newFrame.height > visible.height {
                 let scale = visible.height / newFrame.height
                 newFrame.size.height = visible.height
-                newFrame.size.width = newFrame.width * scale
+                newFrame.size.width = newFrame.size.width * scale
+            }
+            if newFrame.width > visible.width {
+                let scale = visible.width / newFrame.width
+                newFrame.size.width = visible.width
+                newFrame.size.height = newFrame.size.height * scale
             }
             if newFrame.maxY > visible.maxY {
                 newFrame.origin.y = visible.maxY - newFrame.height
             }
             if newFrame.minY < visible.minY {
                 newFrame.origin.y = visible.minY
+            }
+            if newFrame.maxX > visible.maxX {
+                newFrame.origin.x = visible.maxX - newFrame.width
+            }
+            if newFrame.minX < visible.minX {
+                newFrame.origin.x = visible.minX
             }
         }
         window.setFrame(newFrame, display: true, animate: true)

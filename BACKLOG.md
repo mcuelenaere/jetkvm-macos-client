@@ -89,39 +89,6 @@ title bar) and Cmd+Tab works normally.
 
 ---
 
-## True fullscreen mode that hides the menu bar
-
-**Where:** `App/JetKVMClientApp.swift` (Scene/WindowGroup config),
-maybe a new `App/Window/FullscreenController.swift`.
-
-**What's there now:** the WindowGroup uses default macOS fullscreen
-(green button → window goes fullscreen, menu bar auto-hides on
-no-cursor and shows on cursor-to-top-of-screen). For a KVM the
-auto-show is the wrong default — it eats the top row of the host's
-display every time the user nudges the mouse upward.
-
-**Goal:** when the window is fullscreen, the menu bar stays hidden
-*even on cursor-at-top*, so the host's full resolution is visible
-1:1 the entire time. The Dock should also stay hidden.
-
-**Approach:**
-1. Use `NSApplication.shared.presentationOptions` to set
-   `[.autoHideMenuBar, .autoHideDock]` (or `.hideMenuBar` /
-   `.hideDock` for permanent — pick the one that matches the
-   "even on hover" intent; I think the `hide*` variants are
-   permanent and `autoHide*` are the always-show-on-hover ones).
-2. Apply when the window enters fullscreen, revert on exit.
-   `NSWindow.willEnterFullScreenNotification` /
-   `willExitFullScreenNotification` are the hooks.
-3. Probably also worth pinning the cursor to the video rect while
-   fullscreen + capture is on, so the host cursor doesn't drift
-   into the now-invisible menu bar area at the top.
-
-**Don't break the non-fullscreen path** — only apply the
-presentation options while in fullscreen.
-
----
-
 ## Promote scroll wheel to binary HID-RPC (requires upstream JetKVM change)
 
 **Status:** scroll currently goes through JSON-RPC's `wheelReport` method

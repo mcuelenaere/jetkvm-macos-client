@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import JetKVMTransport
 
@@ -12,6 +13,11 @@ import JetKVMTransport
 struct KVMSessionWindow: View {
     let host: SavedHost
     @State private var session = Session()
+    @State private var ownWindow: NSWindow?
+    /// True between this window's didEnterFullScreen and
+    /// didExitFullScreen notifications. Drives StatusStrip
+    /// suppression and the system-presentation-options hide.
+    @State private var isFullscreen = false
     @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
@@ -35,12 +41,13 @@ struct KVMSessionWindow: View {
                     .transition(.opacity)
                 }
             }
-            if isConnectedOrLater {
+            if isConnectedOrLater && !isFullscreen {
                 StatusStrip()
             }
         }
         .environment(session)
         .navigationTitle(host.displayName)
+        .background(WindowAccessor(window: $ownWindow))
         .task {
             // First connection attempt fires on appear. We use .task
             // (not .onAppear) so the connect coroutine is cancelled if
@@ -52,6 +59,28 @@ struct KVMSessionWindow: View {
             // window-close path stays synchronous. The session reaches
             // .idle and gets deallocated when this view's @State drops.
             Task { await session.disconnect() }
+            // If we exit while still fullscreen (e.g. user closes the
+            // window from a fullscreen Space), clear our presentation
+            // override so the menu bar / dock come back for the next
+            // window.
+            if isFullscreen {
+                FullscreenPresentationCounter.shared.exit()
+                isFullscreen = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSWindow.didEnterFullScreenNotification)
+        ) { note in
+            guard let win = note.object as? NSWindow, win === ownWindow else { return }
+            isFullscreen = true
+            FullscreenPresentationCounter.shared.enter()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSWindow.didExitFullScreenNotification)
+        ) { note in
+            guard let win = note.object as? NSWindow, win === ownWindow else { return }
+            isFullscreen = false
+            FullscreenPresentationCounter.shared.exit()
         }
     }
 
@@ -87,5 +116,60 @@ struct KVMSessionWindow: View {
     private func connect() async {
         let saved = PasswordVault.load(for: host.host)
         await session.connect(endpoint: host.endpoint, password: saved)
+    }
+}
+
+/// Resolves the NSWindow hosting the SwiftUI view it's attached to,
+/// publishing the reference back through a Binding. Used by
+/// KVMSessionWindow to scope NSWindow.didEnterFullScreenNotification
+/// observers to its OWN window — the notification posts for any
+/// app window, but with multiple sessions open we only want to react
+/// when our specific window changes fullscreen state.
+private struct WindowAccessor: NSViewRepresentable {
+    @Binding var window: NSWindow?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            window = view.window
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if window !== nsView.window {
+            DispatchQueue.main.async {
+                window = nsView.window
+            }
+        }
+    }
+}
+
+/// Reference counts how many KVMSessionWindows are currently in
+/// fullscreen so we apply NSApp.presentationOptions exactly once and
+/// revert exactly once. NSApp.presentationOptions is process-global —
+/// a single set/clear pair would race when two windows fullscreen at
+/// the same time (e.g. the second exit clobbering the first's hide).
+@MainActor
+private final class FullscreenPresentationCounter {
+    static let shared = FullscreenPresentationCounter()
+    private var refCount = 0
+
+    func enter() {
+        refCount += 1
+        if refCount == 1 {
+            // .hideMenuBar (not .autoHide…) so the menu bar stays
+            // hidden even when the cursor reaches the top of the
+            // screen — the host's display would otherwise lose its
+            // top row every time the user nudged the mouse upward.
+            NSApp.presentationOptions = [.hideMenuBar, .hideDock]
+        }
+    }
+
+    func exit() {
+        refCount = max(0, refCount - 1)
+        if refCount == 0 {
+            NSApp.presentationOptions = []
+        }
     }
 }

@@ -13,6 +13,11 @@ struct HostsView: View {
     @State private var selection: SavedHost.ID?
     @State private var showingAdd = false
     @State private var editing: SavedHost?
+    /// Set non-nil when the user has requested a delete; the alert
+    /// binds to this and fires on confirmation. Routes both the
+    /// context-menu Delete and the per-row trash button through one
+    /// confirmation flow.
+    @State private var hostPendingDelete: SavedHost?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,13 +30,16 @@ struct HostsView: View {
                         isSelected: selection == host.id,
                         onConnect: { connect(host) },
                         onEdit: { editing = host },
-                        onDelete: { store.delete(id: host.id) }
+                        onDelete: { hostPendingDelete = host }
                     )
                     .tag(host.id)
                     .contextMenu {
                         Button("Edit…") { editing = host }
-                        Button("Delete", role: .destructive) {
-                            store.delete(id: host.id)
+                        Button(role: .destructive) {
+                            hostPendingDelete = host
+                        } label: {
+                            Text("Delete")
+                                .foregroundStyle(.red)
                         }
                     }
                 }
@@ -78,6 +86,22 @@ struct HostsView: View {
                     if selection == host.id { selection = nil }
                 }
             )
+        }
+        .alert(
+            "Delete \(hostPendingDelete?.displayName ?? "")?",
+            isPresented: Binding(
+                get: { hostPendingDelete != nil },
+                set: { if !$0 { hostPendingDelete = nil } }
+            ),
+            presenting: hostPendingDelete
+        ) { host in
+            Button("Delete", role: .destructive) {
+                store.delete(id: host.id)
+                if selection == host.id { selection = nil }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { _ in
+            Text("This removes the saved entry. The device itself isn't affected.")
         }
     }
 

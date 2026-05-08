@@ -24,6 +24,7 @@ struct HostFormSheet: View {
 
     @State private var name: String
     @State private var urlText: String
+    @State private var showDeleteConfirmation = false
 
     init(
         mode: Mode,
@@ -94,10 +95,15 @@ struct HostFormSheet: View {
             }
 
             HStack {
-                if let onDelete {
-                    Button("Delete", role: .destructive) {
-                        onDelete()
-                        dismiss()
+                if onDelete != nil {
+                    // role: .destructive on a plain macOS Button
+                    // doesn't auto-color red — only inside alert /
+                    // confirmationDialog. Tint the label explicitly
+                    // so it reads as destructive at a glance.
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Text("Delete").foregroundStyle(.red)
                     }
                 }
                 Spacer()
@@ -109,6 +115,23 @@ struct HostFormSheet: View {
         }
         .padding(28)
         .frame(minWidth: 420)
+        .alert(
+            "Delete \(deleteTitle)?",
+            isPresented: $showDeleteConfirmation
+        ) {
+            Button("Delete", role: .destructive) {
+                onDelete?()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This removes the saved entry. The device itself isn't affected.")
+        }
+    }
+
+    private var deleteTitle: String {
+        if case .edit(let host) = mode { return host.displayName }
+        return ""
     }
 
     private func save() {

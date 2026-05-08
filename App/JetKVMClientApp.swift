@@ -50,25 +50,37 @@ struct JetKVMClientApp: App {
         // its own Session so multiple hosts can be connected at the
         // same time.
         WindowGroup("JetKVM Session", for: KVMSessionWindowID.self) { $sessionID in
-            Group {
-                if let id = sessionID, let host = hostStore.find(id: id.hostID) {
-                    KVMSessionWindow(host: host)
-                } else {
-                    // Restoration failure (intentional) or the host
-                    // has been deleted: render an empty placeholder
-                    // that the user just closes.
-                    Color.clear
-                }
+            if let id = sessionID, let host = hostStore.find(id: id.hostID) {
+                KVMSessionWindow(host: host)
+                    .environment(hostStore)
+                    // 16:9 video at minWidth=800 wants ~525pt of
+                    // video height (plus toolbar / status strip).
+                    // The previous minHeight=600 floored the shrink-
+                    // resize from KVMVideoView and left letterbox
+                    // bars. 400 accommodates 16:9 and most 21:9
+                    // ultrawide displays without going absurdly
+                    // small.
+                    .frame(minWidth: 800, minHeight: 400)
+            } else {
+                // No valid id — typically a window macOS tried to
+                // restore from a previous launch (the system "Reopen
+                // windows on logon" path), where our Codable wrapper
+                // refused to decode. SwiftUI still spawns the window
+                // with a nil binding; self-dismiss it so the user
+                // doesn't see an empty session window flash.
+                OrphanSessionWindowDismisser()
             }
-            .environment(hostStore)
-            // 16:9 video at minWidth=800 wants ~525pt of video height
-            // (plus toolbar / status strip). The previous minHeight=600
-            // floored the shrink-resize from KVMVideoView and left
-            // letterbox bars. 400 accommodates 16:9 and most 21:9
-            // ultrawide displays without going absurdly small.
-            .frame(minWidth: 800, minHeight: 400)
         }
         .defaultSize(width: 1280, height: 800)
+    }
+}
+
+private struct OrphanSessionWindowDismisser: View {
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    var body: some View {
+        Color.clear
+            .onAppear { dismissWindow() }
     }
 }
 

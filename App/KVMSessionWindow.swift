@@ -11,7 +11,7 @@ import JetKVMTransport
 /// peer connection / signaling WS / cookie state don't leak. The user
 /// re-opens by clicking the host again in HostsView.
 struct KVMSessionWindow: View {
-    let host: SavedHost
+    let sessionID: KVMSessionWindowID
     @State private var session = Session()
     @State private var ownWindow: NSWindow?
     /// True between this window's didEnterFullScreen and
@@ -34,7 +34,10 @@ struct KVMSessionWindow: View {
                 }
                 if shouldShowOverlay {
                     ConnectionStatusView(
-                        host: host,
+                        displayName: sessionID.displayName,
+                        urlString: sessionID.urlString,
+                        host: sessionID.host,
+                        endpoint: sessionID.endpoint,
                         onCancel: { dismissWindow() },
                         onRetry: { Task { await connect() } }
                     )
@@ -46,7 +49,7 @@ struct KVMSessionWindow: View {
             }
         }
         .environment(session)
-        .navigationTitle(host.displayName)
+        .navigationTitle(sessionID.displayName)
         .background(WindowAccessor(window: $ownWindow))
         .task {
             // First connection attempt fires on appear. We use .task
@@ -127,8 +130,25 @@ struct KVMSessionWindow: View {
     }
 
     private func connect() async {
-        let saved = PasswordVault.load(for: host.host)
-        await session.connect(endpoint: host.endpoint, password: saved)
+        let saved = PasswordVault.load(for: sessionID.host)
+        await session.connect(endpoint: sessionID.endpoint, password: saved)
+    }
+}
+
+extension KVMSessionWindowID {
+    /// DeviceEndpoint built from the session id's connection fields.
+    /// Used by KVMSessionWindow.connect() and ConnectionStatusView's
+    /// password-resubmit path.
+    var endpoint: DeviceEndpoint {
+        DeviceEndpoint(host: host, port: port, useTLS: useTLS)
+    }
+
+    /// Round-trippable URL string for the connect-overlay's subtitle.
+    /// Drops the port suffix when it matches the scheme default.
+    var urlString: String {
+        let scheme = useTLS ? "https" : "http"
+        let usingDefaultPort = (useTLS && port == 443) || (!useTLS && port == 80)
+        return usingDefaultPort ? "\(scheme)://\(host)" : "\(scheme)://\(host):\(port)"
     }
 }
 

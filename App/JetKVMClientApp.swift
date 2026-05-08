@@ -1,22 +1,35 @@
 import SwiftUI
 import JetKVMTransport
 
-/// Identifier for a KVM session window. Wraps the host's UUID so the
-/// WindowGroup's `for:` slot is a distinct nominal type rather than a
-/// raw UUID — and so we can refuse Codable decoding to opt out of
-/// SwiftUI's session-window state restoration on relaunch.
+/// Identifier for a KVM session window. Carries the full set of
+/// fields needed to connect (display name + endpoint) so the same
+/// shape works for both saved and discovered (mDNS) hosts — the
+/// session window doesn't need to look anything up.
 ///
-/// `restorationBehavior(.disabled)` would express the same intent more
-/// directly, but it's macOS 15+. Throwing on decode achieves the same
-/// effect on macOS 14: SwiftUI tries to restore the previously-open
-/// session windows, fails to deserialize the value, and silently drops
-/// them. Encoding works (in case SwiftUI persists during runtime), so
-/// in-session window-state behaviors keep functioning.
+/// Codable conformance refuses to decode: SwiftUI's macOS-14
+/// WindowGroup auto-restores prior windows from Codable values, and
+/// we'd rather always launch into HostsView. Encoding still works in
+/// case SwiftUI persists state during a runtime session.
+/// (`restorationBehavior(.disabled)` would express this more
+/// directly but it's macOS 15+.)
 struct KVMSessionWindowID: Hashable, Codable {
-    let hostID: SavedHost.ID
+    let displayName: String
+    let host: String
+    let port: Int
+    let useTLS: Bool
 
-    init(_ hostID: SavedHost.ID) {
-        self.hostID = hostID
+    init(saved: SavedHost) {
+        self.displayName = saved.displayName
+        self.host = saved.host
+        self.port = saved.port
+        self.useTLS = saved.useTLS
+    }
+
+    init(discovered: DiscoveredHost) {
+        self.displayName = discovered.instanceName
+        self.host = discovered.host
+        self.port = discovered.port
+        self.useTLS = discovered.useTLS
     }
 
     init(from decoder: Decoder) throws {
@@ -28,13 +41,14 @@ struct KVMSessionWindowID: Hashable, Codable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(hostID)
+        try container.encode([displayName, host, "\(port)", "\(useTLS)"])
     }
 }
 
 @main
 struct JetKVMClientApp: App {
     @State private var hostStore = HostStore()
+    @State private var discovery = DeviceDiscovery()
 
     var body: some Scene {
         // Root window: the saved-hosts list. Single instance — the
@@ -42,17 +56,20 @@ struct JetKVMClientApp: App {
         WindowGroup("JetKVM", id: "hosts") {
             HostsView()
                 .environment(hostStore)
+                .environment(discovery)
+                .onAppear { discovery.start() }
         }
         .defaultSize(width: 520, height: 420)
 
         // One window per connected host. Spawned by openWindow(value:)
         // from HostsView with a KVMSessionWindowID. Each window owns
         // its own Session so multiple hosts can be connected at the
-        // same time.
+        // same time. The window id carries all the connection info
+        // it needs — saved hosts and discovered (mDNS) hosts both
+        // route through here without HostStore lookup.
         WindowGroup("JetKVM Session", for: KVMSessionWindowID.self) { $sessionID in
-            if let id = sessionID, let host = hostStore.find(id: id.hostID) {
-                KVMSessionWindow(host: host)
-                    .environment(hostStore)
+            if let id = sessionID {
+                KVMSessionWindow(sessionID: id)
                     // 16:9 video at minWidth=800 wants ~525pt of
                     // video height (plus toolbar / status strip).
                     // The previous minHeight=600 floored the shrink-

@@ -41,6 +41,19 @@
         <true/>
     </dict>
     <!--
+        Local-network access for mDNS / Bonjour discovery of JetKVM
+        devices on the LAN. macOS prompts the user the first time
+        the app browses for these services. Without these keys,
+        NetServiceBrowser never returns results on macOS 14+ even
+        if the device is broadcasting correctly.
+    -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Used to discover JetKVM devices on your local network.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_jetkvm._tcp</string>
+    </array>
+    <!--
         Don't save window state on quit. macOS's "Reopen windows on
         logon" path was reopening empty session windows because
         SwiftUI's WindowGroup(for: Codable) auto-restores per-value

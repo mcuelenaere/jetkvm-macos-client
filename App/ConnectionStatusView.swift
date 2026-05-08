@@ -8,7 +8,15 @@ import JetKVMTransport
 /// to KVMWindowView).
 struct ConnectionStatusView: View {
     @Environment(Session.self) private var session
-    let host: SavedHost
+    /// Title for the card — saved-host nickname or Bonjour instance.
+    let displayName: String
+    /// URL-shaped subtitle, e.g. "https://kvm.local".
+    let urlString: String
+    /// Hostname used as the keychain lookup key for password save.
+    let host: String
+    /// Endpoint to reconnect with when the user retries / submits
+    /// a password.
+    let endpoint: DeviceEndpoint
     /// Called when the user clicks Cancel. Parent closes the window.
     let onCancel: () -> Void
     /// Called when the user retries after a failure. Parent re-runs
@@ -69,12 +77,12 @@ struct ConnectionStatusView: View {
                 if showSpinner {
                     ProgressView().controlSize(.small)
                 }
-                Text(host.displayName)
+                Text(displayName)
                     .font(.headline)
                 Spacer()
             }
 
-            Text(verbatim: host.urlString)
+            Text(verbatim: urlString)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -130,10 +138,10 @@ struct ConnectionStatusView: View {
     private func submitPassword() async {
         guard !password.isEmpty else { return }
         if rememberPassword {
-            PasswordVault.save(password, for: host.host)
+            PasswordVault.save(password, for: host)
         } else {
-            PasswordVault.delete(for: host.host)
+            PasswordVault.delete(for: host)
         }
-        await session.connect(endpoint: host.endpoint, password: password)
+        await session.connect(endpoint: endpoint, password: password)
     }
 }

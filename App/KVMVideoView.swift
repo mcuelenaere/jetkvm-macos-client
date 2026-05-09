@@ -294,9 +294,15 @@ final class KVMVideoView: NSView {
 
     /// Hide the cursor only while video is actively flowing — not
     /// while we're staring at the no-signal placeholder, where the
-    /// user needs to read text and interact with the card.
+    /// user needs to read text and interact with the card. Also
+    /// keeps the cursor visible while the connect-flow overlay
+    /// (`ConnectionStatusView`) is up, which can sit over us during
+    /// the gap between track attach and the first frame rendering;
+    /// AppKit cursor rects are NSView-scoped and the SwiftUI
+    /// overlay can't shadow them, so we have to check ourselves.
     private var shouldHideCursorOverVideo: Bool {
         guard currentTrack != nil else { return false }
+        guard session?.hasReceivedFirstFrame == true else { return false }
         if let err = session?.videoState?.error, !err.isEmpty { return false }
         return true
     }

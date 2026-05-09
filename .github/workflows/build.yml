@@ -1,0 +1,60 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # The WebRTC binary target is ~100MB. SwiftPM caches it under
+      # the project's DerivedData; key on the resolved manifest so a
+      # dependency bump invalidates the cache cleanly. The package
+      # tests below also reuse the same cache via package-level
+      # `swift test --package-path …`, which writes its own
+      # `.build/` — that one's small and not worth caching.
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages/artifacts
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages/checkouts
+          key: ${{ runner.os }}-spm-${{ hashFiles('JetKVMClient.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      # CODE_SIGNING_ALLOWED=NO disables both signing and provisioning
+      # so we can build without a Developer ID on the runner. The
+      # output app won't be runnable on Gatekeeper-enforced systems,
+      # but for a build-passes signal that's irrelevant. When release
+      # builds land, they'll need their own signed workflow.
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project JetKVMClient.xcodeproj \
+            -scheme JetKVMClient \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Test JetKVMProtocol
+        run: swift test --package-path Packages/JetKVMProtocol
+
+      - name: Test JetKVMTransport
+        run: swift test --package-path Packages/JetKVMTransport

@@ -421,10 +421,10 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		E100000000000000000000E1 /* XCRemoteSwiftPackageReference "WebRTC" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/stasel/WebRTC.git";
+			repositoryURL = "https://github.com/AttilaTheFun/WebRTC.git";
 			requirement = {
 				kind = exactVersion;
-				version = 140.0.0;
+				version = 148.0.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

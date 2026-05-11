@@ -9,12 +9,12 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../JetKVMProtocol"),
-        // M140 is the last version that ships proper macOS headers.
-        // M141..M147 only ship an umbrella WebRTC.h on the macos slice
-        // — the individual `RTCFoo.h` headers it references are missing,
-        // which breaks the Clang module build. Tracked at stasel/WebRTC#145.
-        // Re-evaluate when a fixed release lands.
-        .package(url: "https://github.com/stasel/WebRTC.git", exact: "140.0.0"),
+        // Temporarily on AttilaTheFun's fork at 148.0.0 — fixes the
+        // missing-headers bug on the macOS slice that's blocked us
+        // since M141 (stasel/WebRTC#145, PR #147). Swap back to the
+        // upstream `stasel/WebRTC` tag once #147 merges and a real
+        // release ships from there.
+        .package(url: "https://github.com/AttilaTheFun/WebRTC.git", exact: "148.0.0"),
     ],
     targets: [
         .target(

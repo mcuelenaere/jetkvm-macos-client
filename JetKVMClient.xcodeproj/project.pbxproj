@@ -7,9 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1A00000000000000000000A1 /* DiscoveredHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B1 /* DiscoveredHost.swift */; };
+		1A00000000000000000000A2 /* DeviceDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B2 /* DeviceDiscovery.swift */; };
+		1A00000000000000000000A3 /* TrustedHostStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B3 /* TrustedHostStore.swift */; };
+		2A00000000000000000000A1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2A00000000000000000000B1 /* Localizable.xcstrings */; };
 		D100000000000000000000D1 /* JetKVMClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000000000000000000C1 /* JetKVMClientApp.swift */; };
 		D200000000000000000000D2 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = E200000000000000000000E2 /* WebRTC */; };
 		D300000000000000000000D3 /* JetKVMProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = E400000000000000000000E4 /* JetKVMProtocol */; };
+		D370A16B2FB3CE940040AE62 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D370A16A2FB3CE940040AE62 /* Assets.xcassets */; };
 		D400000000000000000000D4 /* JetKVMTransport in Frameworks */ = {isa = PBXBuildFile; productRef = E600000000000000000000E6 /* JetKVMTransport */; };
 		D600000000000000000000D6 /* KVMWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C500000000000000000000C5 /* KVMWindowView.swift */; };
 		D700000000000000000000D7 /* KVMVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C600000000000000000000C6 /* KVMVideoView.swift */; };
@@ -25,13 +30,13 @@
 		FD00000000000000000000FD /* HostFormSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F400000000000000000000F4 /* HostFormSheet.swift */; };
 		FE00000000000000000000FE /* ConnectionStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F500000000000000000000F5 /* ConnectionStatusView.swift */; };
 		FF00000000000000000000FF /* KVMSessionWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F600000000000000000000F6 /* KVMSessionWindow.swift */; };
-		1A00000000000000000000A1 /* DiscoveredHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B1 /* DiscoveredHost.swift */; };
-		1A00000000000000000000A2 /* DeviceDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B2 /* DeviceDiscovery.swift */; };
-		1A00000000000000000000A3 /* TrustedHostStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B3 /* TrustedHostStore.swift */; };
-		2A00000000000000000000A1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2A00000000000000000000B1 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		1A00000000000000000000B1 /* DiscoveredHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveredHost.swift; sourceTree = "<group>"; };
+		1A00000000000000000000B2 /* DeviceDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiscovery.swift; sourceTree = "<group>"; };
+		1A00000000000000000000B3 /* TrustedHostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustedHostStore.swift; sourceTree = "<group>"; };
+		2A00000000000000000000B1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		C100000000000000000000C1 /* JetKVMClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JetKVMClientApp.swift; sourceTree = "<group>"; };
 		C200000000000000000000C2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C300000000000000000000C3 /* JetKVMClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JetKVMClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -43,16 +48,13 @@
 		CA00000000000000000000CA /* PointerLockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerLockManager.swift; sourceTree = "<group>"; };
 		CB00000000000000000000CB /* PasswordVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordVault.swift; sourceTree = "<group>"; };
 		CC00000000000000000000CC /* HostKeyDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostKeyDetector.swift; sourceTree = "<group>"; };
+		D370A16A2FB3CE940040AE62 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F100000000000000000000F1 /* SavedHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedHost.swift; sourceTree = "<group>"; };
 		F200000000000000000000F2 /* HostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostStore.swift; sourceTree = "<group>"; };
-		1A00000000000000000000B3 /* TrustedHostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustedHostStore.swift; sourceTree = "<group>"; };
 		F300000000000000000000F3 /* HostsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostsView.swift; sourceTree = "<group>"; };
 		F400000000000000000000F4 /* HostFormSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostFormSheet.swift; sourceTree = "<group>"; };
 		F500000000000000000000F5 /* ConnectionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusView.swift; sourceTree = "<group>"; };
 		F600000000000000000000F6 /* KVMSessionWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMSessionWindow.swift; sourceTree = "<group>"; };
-		1A00000000000000000000B1 /* DiscoveredHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveredHost.swift; sourceTree = "<group>"; };
-		1A00000000000000000000B2 /* DeviceDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiscovery.swift; sourceTree = "<group>"; };
-		2A00000000000000000000B1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +83,7 @@
 		A300000000000000000000A3 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				D370A16A2FB3CE940040AE62 /* Assets.xcassets */,
 				C100000000000000000000C1 /* JetKVMClientApp.swift */,
 				F300000000000000000000F3 /* HostsView.swift */,
 				F400000000000000000000F4 /* HostFormSheet.swift */,
@@ -189,6 +192,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D370A16B2FB3CE940040AE62 /* Assets.xcassets in Resources */,
 				2A00000000000000000000A1 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -227,6 +231,8 @@
 		B300000000000000000000B3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -252,6 +258,8 @@
 		B400000000000000000000B4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

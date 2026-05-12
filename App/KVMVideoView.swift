@@ -4,7 +4,7 @@ import JetKVMTransport
 import OSLog
 import WebRTC
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "kvm-view")
+private let log = Logger(subsystem: "app.regi.mac", category: "kvm-view")
 
 /// `NSView` that hosts an `RTCMTLNSVideoView` for rendering a JetKVM video
 /// track and captures keyboard/mouse events for forwarding to the host.

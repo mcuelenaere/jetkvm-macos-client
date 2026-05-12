@@ -3,7 +3,7 @@ import JetKVMProtocol
 import OSLog
 import WebRTC
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "webrtc")
+private let log = Logger(subsystem: "app.regi.mac", category: "webrtc")
 
 public enum WebRTCFacadeError: Error, Sendable {
     case peerConnectionCreationFailed

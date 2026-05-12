@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import Security
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "tls")
+private let log = Logger(subsystem: "app.regi.mac", category: "tls")
 
 /// `URLSessionDelegate` that optionally trusts any server certificate
 /// presented during the TLS handshake. Reserved for future use — at the

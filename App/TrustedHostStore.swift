@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import Observation
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "trusted-hosts")
+private let log = Logger(subsystem: "app.regi.mac", category: "trusted-hosts")
 
 /// Persistent set of hostnames the user has explicitly opted into
 /// trusting for self-signed TLS certs. Keyed by **host string**, not
@@ -26,7 +26,7 @@ private let log = Logger(subsystem: "app.jetkvm.client", category: "trusted-host
 @MainActor
 @Observable
 final class TrustedHostStore {
-    private static let storageKey = "JetKVMTrustedSelfSignedHosts"
+    private static let storageKey = "RegiTrustedSelfSignedHosts"
 
     private(set) var trustedHosts: Set<String>
     private let defaults: UserDefaults

@@ -1,7 +1,7 @@
 import AppKit
 import OSLog
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "host-key")
+private let log = Logger(subsystem: "app.regi.mac", category: "host-key")
 
 /// Watches keyboard state for the pointer-lock release combo
 /// (⌃⌥ — Control + Option held alone for 500ms with no other key

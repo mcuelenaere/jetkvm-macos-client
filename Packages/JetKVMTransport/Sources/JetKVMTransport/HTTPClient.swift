@@ -2,7 +2,7 @@ import Foundation
 import JetKVMProtocol
 import OSLog
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "http")
+private let log = Logger(subsystem: "app.regi.mac", category: "http")
 
 /// HTTP errors surfaced by `HTTPClient`. The login endpoint distinguishes
 /// 400 (noPassword mode), 401 (bad password), and 429 (rate-limited);

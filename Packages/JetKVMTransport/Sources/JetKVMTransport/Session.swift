@@ -4,7 +4,7 @@ import Observation
 import OSLog
 import WebRTC
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "session")
+private let log = Logger(subsystem: "app.regi.mac", category: "session")
 
 public enum SessionError: Error, Sendable {
     /// `GET /device/status` returned `isSetup: false`. The device hasn't

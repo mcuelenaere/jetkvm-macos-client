@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import Observation
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "discovery")
+private let log = Logger(subsystem: "app.regi.mac", category: "discovery")
 
 /// Bonjour browser for JetKVM devices on the local network. Lives
 /// for the app's lifetime; a single shared instance is injected via

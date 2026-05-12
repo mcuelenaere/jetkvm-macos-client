@@ -2,7 +2,7 @@ import Foundation
 import JetKVMProtocol
 import OSLog
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "session")
+private let log = Logger(subsystem: "app.regi.mac", category: "session")
 
 /// Typed wrappers for the JSON-RPC methods the control plane needs.
 ///

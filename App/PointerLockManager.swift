@@ -2,7 +2,7 @@ import AppKit
 import CoreGraphics
 import OSLog
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "pointer-lock")
+private let log = Logger(subsystem: "app.regi.mac", category: "pointer-lock")
 
 /// Pins the macOS cursor in place and hides it, so mouse motion is
 /// reportable as relative deltas instead of an absolute position

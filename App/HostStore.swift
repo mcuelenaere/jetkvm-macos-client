@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import Observation
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "host-store")
+private let log = Logger(subsystem: "app.regi.mac", category: "host-store")
 
 /// Persistent ordered collection of saved hosts.
 ///
@@ -17,7 +17,7 @@ private let log = Logger(subsystem: "app.jetkvm.client", category: "host-store")
 @MainActor
 @Observable
 final class HostStore {
-    private static let storageKey = "JetKVMSavedHosts"
+    private static let storageKey = "RegiSavedHosts"
 
     private(set) var hosts: [SavedHost]
 

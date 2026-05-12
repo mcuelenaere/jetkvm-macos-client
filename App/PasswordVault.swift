@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import Security
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "vault")
+private let log = Logger(subsystem: "app.regi.mac", category: "vault")
 
 /// Thin wrapper over the macOS Keychain for storing JetKVM device
 /// passwords keyed by hostname.
@@ -20,7 +20,7 @@ private let log = Logger(subsystem: "app.jetkvm.client", category: "vault")
 enum PasswordVault {
     /// Generic-password service identifier for our entries. Visible
     /// in Keychain Access if the user wants to inspect.
-    static let service = "app.jetkvm.client.password"
+    static let service = "app.regi.mac.password"
 
     /// Look up a saved password for the given host. nil if there
     /// isn't one (or if Keychain returned an unexpected error).

@@ -3,7 +3,7 @@ import ApplicationServices
 import CoreGraphics
 import OSLog
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "tap")
+private let log = Logger(subsystem: "app.regi.mac", category: "tap")
 
 /// Manages a session-level `CGEventTap` so the app can swallow
 /// system-grabbed key combos (Cmd+Tab, Cmd+Q, Cmd+Space, etc.) and

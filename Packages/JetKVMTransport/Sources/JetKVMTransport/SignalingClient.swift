@@ -2,7 +2,7 @@ import Foundation
 import JetKVMProtocol
 import OSLog
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "signaling")
+private let log = Logger(subsystem: "app.regi.mac", category: "signaling")
 
 public enum SignalingError: Error, Sendable {
     /// The first message we received over the WebSocket wasn't `device-metadata`.

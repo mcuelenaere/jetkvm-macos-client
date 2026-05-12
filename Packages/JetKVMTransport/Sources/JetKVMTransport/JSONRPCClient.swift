@@ -2,7 +2,7 @@ import Foundation
 import JetKVMProtocol
 import OSLog
 
-private let log = Logger(subsystem: "app.jetkvm.client", category: "rpc")
+private let log = Logger(subsystem: "app.regi.mac", category: "rpc")
 
 public enum JSONRPCClientError: Error, Sendable {
     /// Underlying transport (rpc data channel) reported send failure.

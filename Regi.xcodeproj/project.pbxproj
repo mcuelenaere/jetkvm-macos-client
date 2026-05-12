@@ -39,7 +39,7 @@
 		2A00000000000000000000B1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		C100000000000000000000C1 /* JetKVMClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JetKVMClientApp.swift; sourceTree = "<group>"; };
 		C200000000000000000000C2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C300000000000000000000C3 /* JetKVMClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JetKVMClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C300000000000000000000C3 /* Regi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Regi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C500000000000000000000C5 /* KVMWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMWindowView.swift; sourceTree = "<group>"; };
 		C600000000000000000000C6 /* KVMVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMVideoView.swift; sourceTree = "<group>"; };
 		C700000000000000000000C7 /* KeyboardCapturer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardCapturer.swift; sourceTree = "<group>"; };
@@ -118,7 +118,7 @@
 		A500000000000000000000A5 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C300000000000000000000C3 /* JetKVMClient.app */,
+				C300000000000000000000C3 /* Regi.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -126,9 +126,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B100000000000000000000B1 /* JetKVMClient */ = {
+		B100000000000000000000B1 /* Regi */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B200000000000000000000B2 /* Build configuration list for PBXNativeTarget "JetKVMClient" */;
+			buildConfigurationList = B200000000000000000000B2 /* Build configuration list for PBXNativeTarget "Regi" */;
 			buildPhases = (
 				A700000000000000000000A7 /* Sources */,
 				A800000000000000000000A8 /* Frameworks */,
@@ -138,14 +138,14 @@
 			);
 			dependencies = (
 			);
-			name = JetKVMClient;
+			name = Regi;
 			packageProductDependencies = (
 				E200000000000000000000E2 /* WebRTC */,
 				E400000000000000000000E4 /* JetKVMProtocol */,
 				E600000000000000000000E6 /* JetKVMTransport */,
 			);
-			productName = JetKVMClient;
-			productReference = C300000000000000000000C3 /* JetKVMClient.app */;
+			productName = Regi;
+			productReference = C300000000000000000000C3 /* Regi.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -163,7 +163,7 @@
 					};
 				};
 			};
-			buildConfigurationList = B500000000000000000000B5 /* Build configuration list for PBXProject "JetKVMClient" */;
+			buildConfigurationList = B500000000000000000000B5 /* Build configuration list for PBXProject "Regi" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -182,7 +182,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				B100000000000000000000B1 /* JetKVMClient */,
+				B100000000000000000000B1 /* Regi */,
 			);
 		};
 /* End PBXProject section */
@@ -247,7 +247,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.jetkvm.client;
+				PRODUCT_BUNDLE_IDENTIFIER = app.regi.mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -274,7 +274,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.jetkvm.client;
+				PRODUCT_BUNDLE_IDENTIFIER = app.regi.mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -403,7 +403,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		B200000000000000000000B2 /* Build configuration list for PBXNativeTarget "JetKVMClient" */ = {
+		B200000000000000000000B2 /* Build configuration list for PBXNativeTarget "Regi" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B300000000000000000000B3 /* Debug */,
@@ -412,7 +412,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B500000000000000000000B5 /* Build configuration list for PBXProject "JetKVMClient" */ = {
+		B500000000000000000000B5 /* Build configuration list for PBXProject "Regi" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B600000000000000000000B6 /* Debug */,

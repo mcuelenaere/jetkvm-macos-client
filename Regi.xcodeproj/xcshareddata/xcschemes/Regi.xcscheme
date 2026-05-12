@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B100000000000000000000B1"
-               BuildableName = "JetKVMClient.app"
-               BlueprintName = "JetKVMClient"
-               ReferencedContainer = "container:JetKVMClient.xcodeproj">
+               BuildableName = "Regi.app"
+               BlueprintName = "Regi"
+               ReferencedContainer = "container:Regi.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "B100000000000000000000B1"
-            BuildableName = "JetKVMClient.app"
-            BlueprintName = "JetKVMClient"
-            ReferencedContainer = "container:JetKVMClient.xcodeproj">
+            BuildableName = "Regi.app"
+            BlueprintName = "Regi"
+            ReferencedContainer = "container:Regi.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "B100000000000000000000B1"
-            BuildableName = "JetKVMClient.app"
-            BlueprintName = "JetKVMClient"
-            ReferencedContainer = "container:JetKVMClient.xcodeproj">
+            BuildableName = "Regi.app"
+            BlueprintName = "Regi"
+            ReferencedContainer = "container:Regi.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

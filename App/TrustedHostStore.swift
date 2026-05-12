@@ -19,7 +19,7 @@ private let log = Logger(subsystem: "app.jetkvm.client", category: "trusted-host
 /// enough for the current "trust all certs from this host" policy
 /// the JetKVM self-signed-cert UX needs.
 ///
-/// Pass via `.environment(...)` from JetKVMClientApp so KVMSessionWindow
+/// Pass via `.environment(...)` from RegiApp so KVMSessionWindow
 /// (which reads it when building DeviceEndpoint and writes it when
 /// the user accepts the trust prompt) and any future settings UI
 /// (revoke / list) all share one observable instance.

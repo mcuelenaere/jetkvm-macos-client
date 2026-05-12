@@ -11,7 +11,7 @@
 		1A00000000000000000000A2 /* DeviceDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B2 /* DeviceDiscovery.swift */; };
 		1A00000000000000000000A3 /* TrustedHostStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B3 /* TrustedHostStore.swift */; };
 		2A00000000000000000000A1 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2A00000000000000000000B1 /* Localizable.xcstrings */; };
-		D100000000000000000000D1 /* JetKVMClientApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000000000000000000C1 /* JetKVMClientApp.swift */; };
+		D100000000000000000000D1 /* RegiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000000000000000000C1 /* RegiApp.swift */; };
 		D200000000000000000000D2 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = E200000000000000000000E2 /* WebRTC */; };
 		D300000000000000000000D3 /* JetKVMProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = E400000000000000000000E4 /* JetKVMProtocol */; };
 		D370A16B2FB3CE940040AE62 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D370A16A2FB3CE940040AE62 /* Assets.xcassets */; };
@@ -37,7 +37,7 @@
 		1A00000000000000000000B2 /* DeviceDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiscovery.swift; sourceTree = "<group>"; };
 		1A00000000000000000000B3 /* TrustedHostStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustedHostStore.swift; sourceTree = "<group>"; };
 		2A00000000000000000000B1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
-		C100000000000000000000C1 /* JetKVMClientApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JetKVMClientApp.swift; sourceTree = "<group>"; };
+		C100000000000000000000C1 /* RegiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegiApp.swift; sourceTree = "<group>"; };
 		C200000000000000000000C2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C300000000000000000000C3 /* Regi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Regi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C500000000000000000000C5 /* KVMWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KVMWindowView.swift; sourceTree = "<group>"; };
@@ -84,7 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				D370A16A2FB3CE940040AE62 /* Assets.xcassets */,
-				C100000000000000000000C1 /* JetKVMClientApp.swift */,
+				C100000000000000000000C1 /* RegiApp.swift */,
 				F300000000000000000000F3 /* HostsView.swift */,
 				F400000000000000000000F4 /* HostFormSheet.swift */,
 				F500000000000000000000F5 /* ConnectionStatusView.swift */,
@@ -204,7 +204,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D100000000000000000000D1 /* JetKVMClientApp.swift in Sources */,
+				D100000000000000000000D1 /* RegiApp.swift in Sources */,
 				FA00000000000000000000FA /* SavedHost.swift in Sources */,
 				FB00000000000000000000FB /* HostStore.swift in Sources */,
 				1A00000000000000000000A3 /* TrustedHostStore.swift in Sources */,

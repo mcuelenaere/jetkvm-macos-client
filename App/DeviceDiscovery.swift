@@ -6,7 +6,7 @@ private let log = Logger(subsystem: "app.jetkvm.client", category: "discovery")
 
 /// Bonjour browser for JetKVM devices on the local network. Lives
 /// for the app's lifetime; a single shared instance is injected via
-/// `.environment(...)` from JetKVMClientApp.
+/// `.environment(...)` from RegiApp.
 ///
 /// Discovery is the modern client-side counterpart of the
 /// `_jetkvm._tcp` service the JetKVM device advertises (see

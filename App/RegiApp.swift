@@ -56,7 +56,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
-struct JetKVMClientApp: App {
+struct RegiApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var hostStore = HostStore()
     @State private var trustStore = TrustedHostStore()
@@ -65,7 +65,7 @@ struct JetKVMClientApp: App {
     var body: some Scene {
         // Root window: the saved-hosts list. Single instance — the
         // user always returns here to launch sessions.
-        WindowGroup("JetKVM", id: "hosts") {
+        WindowGroup("Regi", id: "hosts") {
             HostsView()
                 .environment(hostStore)
                 .environment(trustStore)
@@ -80,7 +80,7 @@ struct JetKVMClientApp: App {
         // same time. The window id carries all the connection info
         // it needs — saved hosts and discovered (mDNS) hosts both
         // route through here without HostStore lookup.
-        WindowGroup("JetKVM Session", for: KVMSessionWindowID.self) { $sessionID in
+        WindowGroup("KVM Session", for: KVMSessionWindowID.self) { $sessionID in
             if let id = sessionID {
                 KVMSessionWindow(sessionID: id)
                     // Per-host trust opt-ins persist via TrustedHostStore

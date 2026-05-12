@@ -109,13 +109,10 @@
     "Issues with the source device's HDMI output" : {
 
     },
-    "JetKVM" : {
-
-    },
-    "JetKVM Session" : {
-
-    },
     "JetKVM ships with a self-signed certificate by default. Trusting it lets the connection proceed; the choice is remembered for this host." : {
+
+    },
+    "KVM Session" : {
 
     },
     "Keyboard lock" : {
@@ -155,6 +152,9 @@
 
     },
     "Power, codec, and quality controls." : {
+
+    },
+    "Regi" : {
 
     },
     "Receiving video stream…" : {

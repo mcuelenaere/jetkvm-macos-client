@@ -58,7 +58,7 @@ struct HostsView: View {
             }
         }
         .frame(minWidth: 480, minHeight: 360)
-        .navigationTitle("JetKVM")
+        .navigationTitle("Regi")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

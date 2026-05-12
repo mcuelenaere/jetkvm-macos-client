@@ -14,7 +14,7 @@ struct KVMWindowView: View {
 
     /// UserDefaults key for the "Don't show this again" preference on
     /// the pointer-lock confirmation dialog.
-    private static let skipPointerLockConfirmKey = "JetKVMSkipPointerLockConfirmation"
+    private static let skipPointerLockConfirmKey = "RegiSkipPointerLockConfirmation"
 
     private var keyboardCaptureBinding: Binding<Bool> {
         Binding(

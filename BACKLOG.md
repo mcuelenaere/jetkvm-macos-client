@@ -158,7 +158,7 @@ hosts). Worth noting only as a non-goal.
 ## Move WebRTC pin back to upstream `stasel/WebRTC` once M148+ releases
 
 **Where:** `Packages/JetKVMTransport/Package.swift` and
-`JetKVMClient.xcodeproj/project.pbxproj` (the project carries its
+`Regi.xcodeproj/project.pbxproj` (the project carries its
 own `XCRemoteSwiftPackageReference` — both pins have to match or
 SPM errors on conflicting package identity).
 
@@ -183,7 +183,7 @@ the merged tree.
    `stasel/WebRTC`, swap both pins back:
    - `Packages/JetKVMTransport/Package.swift` — restore the
      `https://github.com/stasel/WebRTC.git` URL.
-   - `JetKVMClient.xcodeproj/project.pbxproj` — same URL +
+   - `Regi.xcodeproj/project.pbxproj` — same URL +
      version on the `XCRemoteSwiftPackageReference`.
 2. Delete the `Package.resolved` files (both the workspace one
    under `.../swiftpm/Package.resolved` and the package-level

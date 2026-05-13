@@ -82,7 +82,15 @@ assumes you've configured the device there at least once.
 
 ## Installation
 
-Releases are not published yet. To run from source:
+Grab `Regi.dmg` from the [latest release](https://github.com/mcuelenaere/regi/releases/latest) and drag `Regi.app` into `/Applications`. A bare `Regi.zip` is on the same release page if you'd rather skip the disk image.
+
+> [!NOTE]
+> Regi isn't currently signed by an Apple-trusted developer ID, so macOS Gatekeeper refuses the first launch with *"can't be opened because Apple cannot check it for malicious software."* Bypass once and macOS remembers your choice:
+>
+> - **Finder**: right-click `Regi.app` → **Open** → confirm in the dialog. Subsequent double-clicks work normally.
+> - **Terminal**: `xattr -d com.apple.quarantine /Applications/Regi.app`
+
+### Building from source
 
 ```sh
 git clone https://github.com/mcuelenaere/regi.git

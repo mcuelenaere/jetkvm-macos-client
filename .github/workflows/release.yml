@@ -1,0 +1,174 @@
+# Tag-triggered release workflow. Produces a Regi.zip (bare .app)
+# and a Regi.dmg (drag-to-Applications installer), attached to a
+# GitHub Release auto-generated from commits since the previous
+# tag. Push a tag like `v0.1.0` to trigger.
+#
+# workflow_dispatch is also accepted so you can dry-run the build
+# from a branch without cutting a tag. Branch-triggered runs skip
+# the GitHub Release and upload the artifacts via
+# actions/upload-artifact instead, so test runs don't create
+# public releases.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write   # required for softprops/action-gh-release
+
+    env:
+      SCHEME: Regi
+      PRODUCT: Regi
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # Tag-triggered → use the tag name (with leading `v` stripped).
+      # workflow_dispatch on a branch → synthesise a dev version
+      # from the short SHA so the build still has a valid
+      # MARKETING_VERSION/CURRENT_PROJECT_VERSION and produces
+      # inspectable artifacts. Release upload is gated separately
+      # so test runs don't create real GitHub Releases.
+      - name: Extract version
+        id: version
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              VERSION="${GITHUB_REF#refs/tags/v}"
+              IS_RELEASE=true
+              ;;
+            refs/tags/*)
+              VERSION="${GITHUB_REF#refs/tags/}"
+              IS_RELEASE=true
+              ;;
+            *)
+              VERSION="0.0.0-${GITHUB_SHA:0:7}"
+              IS_RELEASE=false
+              ;;
+          esac
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
+          echo "::notice::Build version $VERSION (release: $IS_RELEASE)"
+
+      - name: Cache SPM packages
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages/artifacts
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages/checkouts
+          key: ${{ runner.os }}-spm-${{ hashFiles('Regi.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      # Ad-hoc signing (`CODE_SIGN_IDENTITY="-"`). Required for the
+      # binary to launch on Apple Silicon at all; doesn't gain
+      # Gatekeeper trust.
+      - name: Archive
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild \
+            -project Regi.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -archivePath build/Regi.xcarchive \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            archive
+
+      - name: Export .app from archive
+        run: |
+          set -euo pipefail
+          cat > build/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>mac-application</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/Regi.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist build/ExportOptions.plist
+
+      - name: Package .app as Regi.zip
+        run: |
+          # `ditto -c -k --keepParent` is the macOS-canonical way to
+          # zip an .app preserving bundle structure (regular `zip`
+          # mangles extended attributes).
+          ditto -c -k --keepParent build/export/Regi.app build/Regi.zip
+
+      # Build the .dmg by hand with hdiutil instead of `brew install
+      # create-dmg`. The Homebrew create-dmg (andreyvit's Bash port)
+      # drives Finder via osascript to lay out icons inside the disk
+      # image — that needs a logged-in GUI session and is famously
+      # flaky on headless macOS runners. hdiutil with a staging
+      # folder gives us a perfectly usable drag-to-Applications
+      # installer (Regi.app + /Applications symlink) with zero
+      # AppleScript involvement.
+      - name: Package .app as Regi.dmg
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/dmg-stage"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+          # `ditto` preserves bundle metadata (extended attributes,
+          # the signature) that `cp -R` can mangle.
+          ditto build/export/Regi.app "$STAGE/Regi.app"
+          ln -s /Applications "$STAGE/Applications"
+          hdiutil create \
+            -volname "Regi" \
+            -srcfolder "$STAGE" \
+            -ov \
+            -format UDZO \
+            build/Regi.dmg
+          rm -rf "$STAGE"
+
+      # Tag-triggered runs → real GitHub Release with auto-generated
+      # notes. workflow_dispatch / branch test runs → upload as a
+      # workflow artifact so you can download and inspect without
+      # creating a public release.
+      - name: Create GitHub Release
+        if: steps.version.outputs.is_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/Regi.zip
+            build/Regi.dmg
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Upload artifacts (test runs)
+        if: steps.version.outputs.is_release != 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: regi-${{ steps.version.outputs.version }}
+          path: |
+            build/Regi.zip
+            build/Regi.dmg

@@ -25,7 +25,10 @@
     "Cancel" : {
 
     },
-    "Capture system keyboard shortcuts (Cmd+Tab, Cmd+Space, …) and/or lock the pointer for relative mouse mode. Keyboard requires Accessibility permission." : {
+    "Capture" : {
+
+    },
+    "Capture system keyboard shortcuts and/or lock the pointer for relative mouse mode. Optionally hide your local cursor over the video area when you'd rather see only the host's cursor. Keyboard capture requires Accessibility permission." : {
 
     },
     "Click + in the toolbar to add a JetKVM device, or wait for one to appear on your local network." : {
@@ -97,6 +100,9 @@
     "HDMI signal error detected." : {
 
     },
+    "Hide cursor over video" : {
+
+    },
     "Holds the power button for 5 seconds." : {
 
     },
@@ -112,10 +118,10 @@
     "JetKVM ships with a self-signed certificate by default. Trusting it lets the connection proceed; the choice is remembered for this host." : {
 
     },
-    "KVM Session" : {
+    "Keyboard lock" : {
 
     },
-    "Keyboard lock" : {
+    "KVM Session" : {
 
     },
     "Live network and video diagnostics." : {
@@ -154,10 +160,10 @@
     "Power, codec, and quality controls." : {
 
     },
-    "Regi" : {
+    "Receiving video stream…" : {
 
     },
-    "Receiving video stream…" : {
+    "Regi" : {
 
     },
     "Remember password" : {

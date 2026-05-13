@@ -30,6 +30,12 @@ final class KVMVideoView: NSView {
     /// `sendPointerMotion` / `sendPointerButtonChange` (absolute,
     /// PointerReport opcode 0x03).
     var pointerLocked: Bool = false
+    /// User opt-in for hiding the macOS cursor over the rendered
+    /// video sub-rect. Off by default so the user can always see
+    /// where they're clicking; on for users who'd rather rely on
+    /// the host-rendered cursor alone (no double-cursor look).
+    /// Driven by an @AppStorage toggle in KVMWindowView.
+    var hideCursorOverVideo: Bool = false
 
     /// Cursor used inside `videoContentRect` while video is actually
     /// flowing — a 1×1 fully-transparent image. Avoids the
@@ -300,7 +306,13 @@ final class KVMVideoView: NSView {
     /// the gap between track attach and the first frame rendering;
     /// AppKit cursor rects are NSView-scoped and the SwiftUI
     /// overlay can't shadow them, so we have to check ourselves.
+    ///
+    /// Gated by the user opt-in (`hideCursorOverVideo`) — off by
+    /// default. When pointer-lock is engaged, the cursor is hidden
+    /// unconditionally via `NSCursor.hide()` in PointerLockManager
+    /// regardless of this flag.
     private var shouldHideCursorOverVideo: Bool {
+        guard hideCursorOverVideo else { return false }
         guard currentTrack != nil else { return false }
         guard session?.hasReceivedFirstFrame == true else { return false }
         if let err = session?.videoState?.error, !err.isEmpty { return false }

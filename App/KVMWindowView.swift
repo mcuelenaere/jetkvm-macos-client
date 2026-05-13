@@ -16,6 +16,13 @@ struct KVMWindowView: View {
     /// the pointer-lock confirmation dialog.
     private static let skipPointerLockConfirmKey = "RegiSkipPointerLockConfirmation"
 
+    /// User opt-in for hiding the macOS cursor over the rendered
+    /// video sub-rect. Off by default — the cursor stays visible so
+    /// the user can see where they're clicking. Stored via
+    /// @AppStorage so the choice persists across launches and
+    /// applies to all session windows.
+    @AppStorage("RegiHideCursorOverVideo") private var hideCursorOverVideo: Bool = false
+
     private var keyboardCaptureBinding: Binding<Bool> {
         Binding(
             // Only show as checked when capture is actually doing
@@ -45,15 +52,85 @@ struct KVMWindowView: View {
         )
     }
 
-    /// Reflects the union of intents — used to label and icon the
-    /// toolbar Capture menu.
-    private var captureSummary: (icon: String, label: String) {
-        switch (capturer.userIntent, pointerLock.userIntent) {
-        case (false, false): return ("keyboard", "Capture")
-        case (true, false):  return ("keyboard.fill", "Capture: kbd")
-        case (false, true):  return ("cursorarrow.rays", "Capture: ptr")
-        case (true, true):   return ("dot.viewfinder", "Capture: kbd+ptr")
+    /// True when keyboard capture is effectively engaged — either
+    /// actively running (`.enabled`) or paused because the app isn't
+    /// frontmost (`.suspended`, which will re-engage on focus).
+    /// `.awaitingAccessibility` / `.failed` don't count: those are
+    /// "user asked but the system said no", which the menu shouldn't
+    /// signal as a green-lit state in the toolbar.
+    private var keyboardCaptureEngaged: Bool {
+        capturer.state == .enabled || capturer.state == .suspended
+    }
+
+    private var pointerLockEngaged: Bool {
+        pointerLock.state == .enabled || pointerLock.state == .suspended
+    }
+
+    /// Render `keyboard` + `magicmouse` side-by-side into a single
+    /// template NSImage so the macOS toolbar can use it as the menu's
+    /// icon. A plain HStack of two SwiftUI Image views *appears* to
+    /// work but the toolbar's NSToolbarItem-image extraction grabs
+    /// only the first child Image, silently dropping the second —
+    /// hence the manual compositing.
+    ///
+    /// Each half is drawn at full alpha when its lock is engaged,
+    /// 40% alpha when not. With `isTemplate = true` the system tints
+    /// the result for the current toolbar style and dark/light mode;
+    /// the partial alpha reads as a faded version of the same tint.
+    ///
+    /// Glyphs are drawn at their intrinsic size (after SymbolConfig
+    /// scaling) so neither one is squished — `keyboard` is wider
+    /// than `magicmouse`, and forcing both into equal squares makes
+    /// the keyboard look compressed.
+    private static func dualCaptureIcon(
+        keyboardEngaged: Bool,
+        pointerEngaged: Bool
+    ) -> Image {
+        let pointSize: CGFloat = 15
+        let gap: CGFloat = 2
+        let cfg = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
+        let kbd = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg)
+        let mouse = NSImage(systemSymbolName: "magicmouse", accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg)
+        let kbdSize = kbd?.size ?? .zero
+        let mouseSize = mouse?.size ?? .zero
+        let canvasWidth = kbdSize.width + gap + mouseSize.width
+        let canvasHeight = max(kbdSize.height, mouseSize.height)
+        let img = NSImage(
+            size: NSSize(width: canvasWidth, height: canvasHeight),
+            flipped: false
+        ) { _ in
+            if let kbd {
+                kbd.draw(
+                    in: NSRect(
+                        x: 0,
+                        y: (canvasHeight - kbdSize.height) / 2,
+                        width: kbdSize.width,
+                        height: kbdSize.height
+                    ),
+                    from: .zero,
+                    operation: .sourceOver,
+                    fraction: keyboardEngaged ? 1.0 : 0.4
+                )
+            }
+            if let mouse {
+                mouse.draw(
+                    in: NSRect(
+                        x: kbdSize.width + gap,
+                        y: (canvasHeight - mouseSize.height) / 2,
+                        width: mouseSize.width,
+                        height: mouseSize.height
+                    ),
+                    from: .zero,
+                    operation: .sourceOver,
+                    fraction: pointerEngaged ? 1.0 : 0.4
+                )
+            }
+            return true
         }
+        img.isTemplate = true
+        return Image(nsImage: img)
     }
 
     var body: some View {
@@ -73,7 +150,8 @@ struct KVMWindowView: View {
                 KVMVideoRepresentable(
                     track: track,
                     session: session,
-                    pointerLocked: pointerLock.state == .enabled
+                    pointerLocked: pointerLock.state == .enabled,
+                    hideCursorOverVideo: hideCursorOverVideo
                 )
             } else {
                 ProgressView("Waiting for video…")
@@ -123,10 +201,18 @@ struct KVMWindowView: View {
                     Toggle(isOn: pointerLockBinding) {
                         Label("Pointer lock", systemImage: "cursorarrow.rays")
                     }
+                    Divider()
+                    Toggle(isOn: $hideCursorOverVideo) {
+                        Label("Hide cursor over video", systemImage: "cursorarrow.slash")
+                    }
                 } label: {
-                    Label(captureSummary.label, systemImage: captureSummary.icon)
+                    Self.dualCaptureIcon(
+                        keyboardEngaged: keyboardCaptureEngaged,
+                        pointerEngaged: pointerLockEngaged
+                    )
+                    .accessibilityLabel("Capture")
                 }
-                .help("Capture system keyboard shortcuts (Cmd+Tab, Cmd+Space, …) and/or lock the pointer for relative mouse mode. Keyboard requires Accessibility permission.")
+                .help("Capture system keyboard shortcuts and/or lock the pointer for relative mouse mode. Optionally hide your local cursor over the video area when you'd rather see only the host's cursor. Keyboard capture requires Accessibility permission.")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -338,11 +424,13 @@ private struct KVMVideoRepresentable: NSViewRepresentable {
     let track: RTCVideoTrack
     let session: Session
     let pointerLocked: Bool
+    let hideCursorOverVideo: Bool
 
     func makeNSView(context: Context) -> KVMVideoView {
         let view = KVMVideoView()
         view.setSession(session)
         view.pointerLocked = pointerLocked
+        view.hideCursorOverVideo = hideCursorOverVideo
         view.attach(track: track)
         return view
     }
@@ -350,11 +438,13 @@ private struct KVMVideoRepresentable: NSViewRepresentable {
     func updateNSView(_ nsView: KVMVideoView, context: Context) {
         nsView.setSession(session)
         nsView.pointerLocked = pointerLocked
+        nsView.hideCursorOverVideo = hideCursorOverVideo
         nsView.attach(track: track)
         // SwiftUI re-runs updateNSView whenever observed Session
         // state changes. Tell the NSView to reconsider its
         // cursor-rect hide condition (videoState.error may have
-        // appeared/cleared).
+        // appeared/cleared, or the user toggled hideCursorOverVideo
+        // in the toolbar settings menu).
         nsView.refreshCursorRects()
     }
 

@@ -4,7 +4,6 @@ import WebRTC
 
 struct KVMWindowView: View {
     @Environment(Session.self) private var session
-    @Environment(\.dismissWindow) private var dismissWindow
     @State private var capturer = KeyboardCapturer()
     @State private var pointerLock = PointerLockManager()
     @State private var hostKey = HostKeyDetector()
@@ -239,16 +238,18 @@ struct KVMWindowView: View {
                 }
                 .help("Live network and video diagnostics.")
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Disconnect") {
-                    // Close the window; KVMSessionWindow's onDisappear
-                    // tears the session down. Calling
-                    // session.disconnect() directly here would just
-                    // bounce us back to the connect overlay.
-                    dismissWindow()
-                }
-            }
         }
+        // Publish actions for the app-wide File menu (RegiCommands).
+        // While this window is focused, the menu shows session
+        // commands (Controls / Connection Stats); when the hosts
+        // window or no window is focused, the menu falls back to
+        // "Add Host…". The standard close-window action (⌘W) tears
+        // the session down via .onDisappear, so no explicit
+        // Disconnect entry is needed.
+        .focusedSceneValue(\.sessionActions, SessionActions(
+            toggleControls: { showControls.toggle() },
+            toggleStats: { showStats.toggle() }
+        ))
         .onAppear {
             // Wire capturer event handlers into the same Session methods
             // KVMVideoView calls when the tap isn't installed. Same

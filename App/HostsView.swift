@@ -1,5 +1,12 @@
 import SwiftUI
 
+extension Notification.Name {
+    /// Posted by the `File > Add Host…` command (and its ⌘N
+    /// shortcut). HostsView listens via .onReceive and presents the
+    /// add-host sheet — the same one the toolbar's `+` button opens.
+    static let regiAddHost = Notification.Name("RegiAddHost")
+}
+
 /// Root window: list of saved hosts plus mDNS-discovered devices on
 /// the local network. Plus button to add. Single-click selects;
 /// Return on a selection or click the per-row play button to open a
@@ -74,6 +81,9 @@ struct HostsView: View {
                 store.add(host)
                 selection = HostListEntry.saved(host).id
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .regiAddHost)) { _ in
+            showingAdd = true
         }
         .sheet(item: $editing) { host in
             HostFormSheet(

@@ -55,6 +55,59 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Closures the active KVM session window publishes so the app-wide
+/// File menu can switch from "Add Host…" (hosts window focused) to
+/// session-specific commands (KVM window focused). Closures capture
+/// each window's local SwiftUI state — the menu just invokes them.
+struct SessionActions {
+    let toggleControls: () -> Void
+    let toggleStats: () -> Void
+}
+
+private struct SessionActionsFocusedValueKey: FocusedValueKey {
+    typealias Value = SessionActions
+}
+
+extension FocusedValues {
+    /// Set by the focused KVM session window; nil when any other
+    /// window (the hosts list, or no window) is active.
+    var sessionActions: SessionActions? {
+        get { self[SessionActionsFocusedValueKey.self] }
+        set { self[SessionActionsFocusedValueKey.self] = newValue }
+    }
+}
+
+/// File-menu command set. Replaces the entire SwiftUI-auto-generated
+/// `.newItem` group (which would otherwise add "New Regi Window" and
+/// "New KVM Session Window" entries — both wrong: hosts is single-
+/// instance, session windows are opened by selecting a host).
+///
+/// Menu contents switch based on which window is frontmost:
+///   - hosts window focused   → "Add Host…"
+///   - KVM session focused    → "Show Controls" / "Show Connection
+///                              Stats" (no "Disconnect" — ⌘W close-
+///                              window already tears the session
+///                              down via KVMSessionWindow.onDisappear)
+struct RegiCommands: Commands {
+    @FocusedValue(\.sessionActions) private var sessionActions
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            if let sessionActions {
+                Button("Show Controls", action: sessionActions.toggleControls)
+                    .keyboardShortcut("k", modifiers: .command)
+                Button("Show Connection Stats", action: sessionActions.toggleStats)
+                    .keyboardShortcut("i", modifiers: .command)
+            } else {
+                Button("Add Host…") {
+                    NotificationCenter.default.post(name: .regiAddHost, object: nil)
+                }
+                .keyboardShortcut("n", modifiers: .command)
+            }
+        }
+    }
+}
+
 @main
 struct RegiApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -73,6 +126,7 @@ struct RegiApp: App {
                 .onAppear { discovery.start() }
         }
         .defaultSize(width: 520, height: 420)
+        .commands { RegiCommands() }
 
         // One window per connected host. Spawned by openWindow(value:)
         // from HostsView with a KVMSessionWindowID. Each window owns

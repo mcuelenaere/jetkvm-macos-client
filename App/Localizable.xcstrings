@@ -13,6 +13,9 @@
     "Add Host" : {
 
     },
+    "Add Host…" : {
+
+    },
     "Address" : {
 
     },
@@ -62,9 +65,6 @@
 
     },
     "Device requires a password." : {
-
-    },
-    "Disconnect" : {
 
     },
     "Don't show this again" : {
@@ -191,6 +191,12 @@
 
     },
     "Session totals" : {
+
+    },
+    "Show Connection Stats" : {
+
+    },
+    "Show Controls" : {
 
     },
     "Sign In" : {

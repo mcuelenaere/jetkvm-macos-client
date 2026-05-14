@@ -155,7 +155,7 @@ jobs:
       # creating a public release.
       - name: Create GitHub Release
         if: steps.version.outputs.is_release == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             build/Regi.zip

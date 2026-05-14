@@ -38,54 +38,6 @@ Measure before doing both — coalescing alone may close the gap.
 
 ---
 
-## Rework cookie handling to use a proper cookie jar
-
-**Where:** `Packages/JetKVMTransport/Sources/JetKVMTransport/HTTPClient.swift`
-(plus `SignalingClient.swift` which receives the resulting `Cookie:`
-header value).
-
-**What's there now:** `HTTPClient` keeps `private var cookieJar:
-[String: String]`. On each response it parses `Set-Cookie` via
-`HTTPCookie.cookies(withResponseHeaderFields:for:)` and stores
-`name → value`. On each request it attaches a single
-`Cookie: name=value; …` header by hand. URLSession's automatic cookie
-machinery is explicitly disabled (`httpCookieStorage = nil`,
-`httpShouldSetCookies = false`).
-
-**Why it landed this way:** in M1 hardware testing,
-`HTTPCookieStorage` (the proper API) silently dropped cookies — even
-after explicit `setCookie(_:)`, `cookies(for:)` returned `nil` on the
-next request and the auth cookie didn't ride along. Bypassing OS
-cookie storage entirely was the fastest path to a working M1.
-
-**Why it should be reworked:**
-
-- Doesn't honour `Domain`, `Path`, `Secure`, `HttpOnly`, `Expires`,
-  `Max-Age`, `SameSite`. JetKVM only sets one `authToken` cookie for
-  one host today, so this hasn't bitten us — but anything that adds a
-  second host, a path-scoped cookie, or expiry semantics will.
-- Sharing with `SignalingClient` is by passing a flat string, which
-  loses all attribute information. A proper jar would let the WS
-  client query "give me cookies for this URL" itself.
-- Thread-safety is a single `NSLock` rather than the OS-managed
-  storage's queue.
-
-**What "fixed" looks like:**
-
-1. Diagnose why `HTTPCookieStorage` lost cookies in our setup. Hypothesis:
-   `URLSessionConfiguration.ephemeral` may set up its own cookie storage
-   and our override is ignored, or there's an interaction with the
-   per-session delegate. A small repro (one URL session, hit a known
-   `Set-Cookie` echo server, `cookies(for:)` should return it) would
-   pin it down.
-2. Either fix the storage configuration so the OS-managed jar works,
-   or implement a small RFC-6265 jar on top of `[HTTPCookie]` (Foundation
-   has `HTTPCookie` parsing; we'd own the storage and lookup logic).
-3. Have `SignalingClient` query the jar for cookies for the WS URL
-   instead of receiving a pre-built header string.
-
----
-
 ## Clipboard sync between client and host (feasibility limited)
 
 **Why this is harder for a hardware KVM than for a VM.** All the

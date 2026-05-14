@@ -25,50 +25,49 @@ public enum HTTPClientError: Error, Sendable, Equatable {
 
 /// HTTP client for JetKVM's REST endpoints.
 ///
-/// One client per device. Manages the auth cookie by hand rather than
-/// relying on `HTTPCookieStorage`: in hardware testing, even after
-/// explicitly calling `setCookie(_:)` on a per-instance `HTTPCookieStorage`,
-/// `cookies(for:)` returned nothing and the auth cookie didn't ride
-/// along on the next request. Bypassing the OS cookie machinery and
-/// attaching `Cookie:` headers ourselves removes the entire failure mode.
+/// One client per device. Cookies are managed by URLSession's own
+/// `HTTPCookieStorage` — `.ephemeral` URLSessionConfigurations ship a
+/// fresh in-memory cookie storage per instance, scoped to that
+/// session. `Set-Cookie` on responses is parsed and stored
+/// automatically (with full RFC-6265 attributes); `Cookie` is
+/// attached to subsequent requests for matching URLs without our
+/// help. The same storage is exposed via `cookieStorage` so
+/// `SignalingClient` can share it for the WebSocket upgrade.
 public final class HTTPClient: @unchecked Sendable {
     public let endpoint: DeviceEndpoint
     public let urlSession: URLSession
     private let tlsDelegate: TLSDelegate
 
-    /// Manually-managed cookie jar. Single dictionary keyed by cookie
-    /// name; this is sufficient for JetKVM's only cookie (`authToken`)
-    /// and avoids the complexity of full RFC-6265 storage semantics
-    /// for a single host.
-    private let cookiesLock = NSLock()
-    private var cookieJar: [String: String] = [:]
-
     private let encoder: JSONEncoder = JSONEncoder()
     private let decoder: JSONDecoder = JSONDecoder()
 
-    public init(endpoint: DeviceEndpoint) {
+    /// Designated initializer. Public callers use the no-config
+    /// overload; tests inject a `URLSessionConfiguration` with
+    /// `protocolClasses = [MockURLProtocol.self]` so the round-trip
+    /// can be verified without a real device.
+    internal init(endpoint: DeviceEndpoint, configuration: URLSessionConfiguration) {
         self.endpoint = endpoint
-        let config = URLSessionConfiguration.ephemeral
-        // Turn off URLSession's automatic cookie handling so we don't have to
-        // fight it; everything goes through `cookieJar`.
-        config.httpCookieStorage = nil
-        config.httpCookieAcceptPolicy = .never
-        config.httpShouldSetCookies = false
-        config.timeoutIntervalForRequest = 10
-        config.timeoutIntervalForResource = 30
+        configuration.timeoutIntervalForRequest = 10
+        configuration.timeoutIntervalForResource = 30
         let delegate = TLSDelegate(allowSelfSignedCertificate: endpoint.allowSelfSignedCertificate)
         self.tlsDelegate = delegate
-        self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        self.urlSession = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }
 
-    /// Cookie header value to attach to ad-hoc requests outside this
-    /// client (e.g. the WebSocket signaling upgrade in `SignalingClient`).
-    /// Returns nil when the jar is empty.
-    public var currentCookieHeader: String? {
-        cookiesLock.lock()
-        defer { cookiesLock.unlock() }
-        guard !cookieJar.isEmpty else { return nil }
-        return cookieJar.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
+    public convenience init(endpoint: DeviceEndpoint) {
+        // `.ephemeral` returns a fresh per-call config with a
+        // brand-new in-memory `HTTPCookieStorage`. Per-HTTPClient
+        // scoping falls out naturally — no risk of leaking cookies
+        // between sessions, no shared global state.
+        self.init(endpoint: endpoint, configuration: .ephemeral)
+    }
+
+    /// The `HTTPCookieStorage` URLSession uses to capture and
+    /// attach cookies for requests made through this client. Shared
+    /// with `SignalingClient` (via `Session.connect`) so the WS
+    /// upgrade carries the auth cookie URLSession captured here.
+    public var cookieStorage: HTTPCookieStorage? {
+        urlSession.configuration.httpCookieStorage
     }
 
     // MARK: - Endpoints
@@ -89,9 +88,9 @@ public final class HTTPClient: @unchecked Sendable {
     }
 
     /// `POST /auth/login-local` — public. On success the server's
-    /// `Set-Cookie: authToken=<uuid>` is parsed out of the response by
-    /// hand and stored in `cookieJar`; subsequent requests attach it
-    /// via the `Cookie:` header.
+    /// `Set-Cookie: authToken=<uuid>` is captured by URLSession into
+    /// the session's `HTTPCookieStorage`; subsequent requests
+    /// automatically include it via the `Cookie:` header.
     public func login(password: String) async throws {
         let url = endpoint.httpURL(path: "/auth/login-local")
         var req = URLRequest(url: url)
@@ -99,7 +98,6 @@ public final class HTTPClient: @unchecked Sendable {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.httpBody = try encoder.encode(LoginRequest(password: password))
-        attachCookies(to: &req)
         let (data, response) = try await rawCall(req)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw HTTPClientError.invalidResponse
@@ -108,8 +106,7 @@ public final class HTTPClient: @unchecked Sendable {
         if !(200..<300).contains(httpResponse.statusCode) {
             throw mapError(statusCode: httpResponse.statusCode, headers: httpResponse.allHeaderFields, body: data)
         }
-        captureCookies(from: httpResponse, requestURL: url)
-        log.debug("login OK; cookieJar=\(self.cookieDump(), privacy: .public)")
+        log.debug("login OK")
     }
 
     // MARK: - Internal request plumbing
@@ -119,8 +116,7 @@ public final class HTTPClient: @unchecked Sendable {
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        attachCookies(to: &req)
-        log.debug("GET \(url.absoluteString, privacy: .public); cookies=\(self.cookieDump(), privacy: .public)")
+        log.debug("GET \(url.absoluteString, privacy: .public)")
         return try await perform(req)
     }
 
@@ -137,11 +133,6 @@ public final class HTTPClient: @unchecked Sendable {
         let (data, response) = try await rawCall(request)
         guard let http = response as? HTTPURLResponse else {
             throw HTTPClientError.invalidResponse
-        }
-        // Capture any cookies even on non-2xx responses; servers sometimes
-        // set cookies on 4xx (e.g. session-rotation on auth failure).
-        if let url = request.url {
-            captureCookies(from: http, requestURL: url)
         }
         guard (200..<300).contains(http.statusCode) else {
             throw mapError(statusCode: http.statusCode, headers: http.allHeaderFields, body: data)
@@ -184,42 +175,7 @@ public final class HTTPClient: @unchecked Sendable {
         }
     }
 
-    // MARK: - Cookie jar
-
-    private func attachCookies(to request: inout URLRequest) {
-        cookiesLock.lock()
-        defer { cookiesLock.unlock() }
-        guard !cookieJar.isEmpty else { return }
-        let header = cookieJar.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
-        request.setValue(header, forHTTPHeaderField: "Cookie")
-    }
-
-    private func captureCookies(from response: HTTPURLResponse, requestURL: URL) {
-        // Pull all string-typed headers and run them through HTTPCookie's
-        // own parser — that's the only way to handle multi-Set-Cookie
-        // responses correctly (commas in Expires dates make naive
-        // splitting unsafe).
-        var headers: [String: String] = [:]
-        for (key, value) in response.allHeaderFields {
-            if let k = key as? String, let v = value as? String {
-                headers[k] = v
-            }
-        }
-        let parsed = HTTPCookie.cookies(withResponseHeaderFields: headers, for: requestURL)
-        guard !parsed.isEmpty else { return }
-        cookiesLock.lock()
-        defer { cookiesLock.unlock() }
-        for cookie in parsed {
-            cookieJar[cookie.name] = cookie.value
-        }
-    }
-
-    private func cookieDump() -> String {
-        cookiesLock.lock()
-        defer { cookiesLock.unlock() }
-        if cookieJar.isEmpty { return "(none)" }
-        return cookieJar.map { "\($0.key)=\($0.value.prefix(8))…" }.joined(separator: ", ")
-    }
+    // MARK: - Helpers
 
     private func headerKeys(_ response: HTTPURLResponse) -> String {
         response.allHeaderFields.keys.compactMap { $0 as? String }.joined(separator: ", ")

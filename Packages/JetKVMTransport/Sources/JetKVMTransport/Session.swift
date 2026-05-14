@@ -204,7 +204,7 @@ public final class Session {
             state = .connecting(.signaling)
             let signaling = SignalingClient(
                 endpoint: endpoint,
-                cookieHeader: http.currentCookieHeader
+                cookieStorage: http.cookieStorage
             )
             self.signaling = signaling
             let (metadata, incoming) = try await signaling.connect()
@@ -750,7 +750,7 @@ public final class Session {
             state = .connecting(.signaling)
             let signaling = SignalingClient(
                 endpoint: endpoint,
-                cookieHeader: http.currentCookieHeader
+                cookieStorage: http.cookieStorage
             )
             self.signaling = signaling
             let (metadata, incoming) = try await signaling.connect()

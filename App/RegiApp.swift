@@ -45,13 +45,39 @@ struct KVMSessionWindowID: Hashable, Codable {
     }
 }
 
-/// Bridges SwiftUI's App lifecycle to a small NSApplicationDelegate
-/// — only used to opt into "quit when the last window closes."
-/// Default macOS behavior keeps the process running with no
-/// windows; for a session-oriented client that's the wrong default.
+/// Bridges SwiftUI's App lifecycle to a small NSApplicationDelegate.
+/// Used to opt into "quit when the last window closes" and to add
+/// a "Show Hosts" item to the dock-icon right-click menu so the
+/// user can re-summon the hosts window after closing it (while a
+/// session window keeps the app alive).
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+
+    /// Items to add to the dock icon's right-click menu. The
+    /// system-provided entries (Quit, Show, Options, etc.) appear
+    /// below ours automatically.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let showHosts = NSMenuItem(
+            title: String(localized: "Show Hosts"),
+            action: #selector(showHosts(_:)),
+            keyEquivalent: ""
+        )
+        showHosts.target = self
+        menu.addItem(showHosts)
+        return menu
+    }
+
+    /// `openWindow(id:)` lives on the SwiftUI environment and
+    /// can't be reached from a plain NSObject, so we post a
+    /// notification HostsView / KVMSessionWindow pick up. The
+    /// hosts scene is a `Window` (single-instance), so the
+    /// resulting `openWindow(id: "hosts")` either brings the
+    /// existing window forward or opens a fresh one.
+    @objc private func showHosts(_ sender: Any?) {
+        NotificationCenter.default.post(name: .regiShowHosts, object: nil)
     }
 }
 
@@ -105,6 +131,12 @@ struct RegiCommands: Commands {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
+        // No custom `Window > Hosts` command: SwiftUI auto-injects
+        // a Window menu entry for every open scene (titled "Regi"
+        // for the hosts window via the `Window("Regi", …)` first
+        // parameter). Adding our own duplicated it. Together with
+        // the dock-icon reopen wired up in AppDelegate, the auto-
+        // entry covers the navigation case.
     }
 }
 
@@ -116,9 +148,14 @@ struct RegiApp: App {
     @State private var discovery = DeviceDiscovery()
 
     var body: some Scene {
-        // Root window: the saved-hosts list. Single instance — the
-        // user always returns here to launch sessions.
-        WindowGroup("Regi", id: "hosts") {
+        // Root window: the saved-hosts list. `Window` (singular) —
+        // not `WindowGroup` — because we want a strict single-
+        // instance scene. `WindowGroup` permits multiple instances
+        // and `openWindow(id:)` spawns a new one each call, which
+        // breaks the "Window > Hosts" / dock-icon-reopen flow.
+        // `Window`'s `openWindow(id:)` brings the existing instance
+        // forward instead.
+        Window("Hosts", id: "hosts") {
             HostsView()
                 .environment(hostStore)
                 .environment(trustStore)

@@ -106,6 +106,9 @@
     "Holds the power button for 5 seconds." : {
 
     },
+    "Hosts" : {
+
+    },
     "https://kvm.local or kvm.local" : {
 
     },
@@ -163,9 +166,6 @@
     "Receiving video stream…" : {
 
     },
-    "Regi" : {
-
-    },
     "Remember password" : {
 
     },
@@ -197,6 +197,9 @@
 
     },
     "Show Controls" : {
+
+    },
+    "Show Hosts" : {
 
     },
     "Sign In" : {
